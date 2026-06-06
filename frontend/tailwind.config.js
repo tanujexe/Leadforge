@@ -27,6 +27,8 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "sans-serif"],
+        brand: ["Outfit", "sans-serif"],
+        display: ["Space Grotesk", "sans-serif"],
       }
     },
   },

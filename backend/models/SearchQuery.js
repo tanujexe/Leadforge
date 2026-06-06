@@ -1,0 +1,16 @@
+const mongoose = require('mongoose');
+
+const SearchQuerySchema = new mongoose.Schema({
+  businessType: { type: String, required: true },
+  location: { type: String, required: true },
+  leadCount: { type: Number, default: 0 },
+  status: { 
+    type: String, 
+    enum: ['Pending', 'Scraping', 'Auditing', 'Analyzing', 'Completed', 'Failed'], 
+    default: 'Pending' 
+  }
+}, {
+  timestamps: true
+});
+
+module.exports = mongoose.model('SearchQuery', SearchQuerySchema);
