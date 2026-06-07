@@ -92,6 +92,6 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`LeadForge AI Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
+  console.log(`ClientScout Backend running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
   console.log(`Access API health at http://localhost:${PORT}/health`);
 });

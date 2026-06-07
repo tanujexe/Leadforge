@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const connStr = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/leadforge';
+    const connStr = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/clientscout';
     console.log(`Connecting to MongoDB: ${connStr}`);
     
     const conn = await mongoose.connect(connStr, {

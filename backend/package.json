@@ -1,7 +1,7 @@
 {
-  "name": "leadforge-backend",
+  "name": "clientscout-backend",
   "version": "1.0.0",
-  "description": "Backend API service for LeadForge AI lead generation and intelligence",
+  "description": "Backend API service for ClientScout lead generation and intelligence",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

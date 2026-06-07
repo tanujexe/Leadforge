@@ -15,7 +15,7 @@ function validateEnv() {
 
   // Validate MONGODB_URI
   if (!process.env.MONGODB_URI) {
-    warnings.push('MONGODB_URI is not set. Defaulting to local instance: mongodb://127.0.0.1:27017/leadforge');
+    warnings.push('MONGODB_URI is not set. Defaulting to local instance: mongodb://127.0.0.1:27017/clientscout');
   }
 
   // Validate APIFY_TOKEN
