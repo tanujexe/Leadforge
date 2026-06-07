@@ -1,0 +1,8 @@
+<svg viewBox="0 0 170 40" width="170" height="40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="170" height="40" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1"/>
+  <g transform="translate(14, 4)">
+    <path d="M 21 11 A 7 7 0 1 0 21 21 M 21 21 L 28 28" stroke="#0F172A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="15.8" y="16.2" fill="#2563EB" font-family="Outfit, 'Space Grotesk', Inter, system-ui, sans-serif" font-size="10.5" font-weight="900" text-anchor="middle" dominant-baseline="central">S</text>
+    <text x="38" y="21" fill="#0F172A" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" letter-spacing="0.1em">CLIENT<tspan fill="#2563EB">SCOUT</tspan></text>
+  </g>
+</svg>
