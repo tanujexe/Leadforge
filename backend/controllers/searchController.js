@@ -12,20 +12,21 @@ const { correctBusinessType } = require('../utils/typoCorrector');
  */
 async function runSearchWorker(searchId, businessType, location) {
   try {
-    // Check for duplicate search query in the last 7 days (Case-Insensitive)
+    // Check for duplicate search queries in the last 7 days (Case-Insensitive)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const recentQuery = await SearchQuery.findOne({
+    const duplicateQueries = await SearchQuery.find({
       businessType: { $regex: new RegExp('^' + businessType.trim() + '$', 'i') },
       location: { $regex: new RegExp('^' + location.trim() + '$', 'i') },
       status: 'Completed',
       createdAt: { $gte: sevenDaysAgo }
     });
 
-    if (recentQuery) {
-      console.log(`[Search Worker] Found recent matching search query: ${recentQuery._id}. Reusing leads.`);
+    if (duplicateQueries.length > 0) {
+      console.log(`[Search Worker] Found ${duplicateQueries.length} recent matching search queries. Reusing leads.`);
       await SearchQuery.findByIdAndUpdate(searchId, { status: 'Scraping' });
       
-      const leadsToReuse = await Lead.find({ searchQueryId: recentQuery._id });
+      const duplicateQueryIds = duplicateQueries.map(q => q._id);
+      const leadsToReuse = await Lead.find({ searchQueryId: { $in: duplicateQueryIds } });
       
       if (leadsToReuse.length > 0) {
         await SearchQuery.findByIdAndUpdate(searchId, { 
@@ -253,8 +254,8 @@ const getSearchQueryStatus = async (req, res, next) => {
       throw new Error('Search query log not found');
     }
 
-    // Find leads linked to this search query
-    const leads = await Lead.find({ searchQueryId: searchQuery._id }).sort({ createdAt: -1 });
+    // Find leads linked to this search query (exclude soft-deleted ones)
+    const leads = await Lead.find({ searchQueryId: searchQuery._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,

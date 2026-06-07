@@ -15,8 +15,8 @@ const getAllLeads = async (req, res, next) => {
 
     const { search, hasWebsite, opportunityLevel, status, websiteStatus, category, city } = req.query;
     
-    // Build query object
-    let query = {};
+    // Build query object (filter out soft-deleted leads)
+    let query = { isDeleted: { $ne: true } };
 
     // 1. Full-text search using MongoDB Text Index
     if (search) {
@@ -26,11 +26,13 @@ const getAllLeads = async (req, res, next) => {
     // 2. Filter: Has Website
     if (hasWebsite) {
       if (hasWebsite === 'true') {
-        query.website = { $ne: null, $ne: '' };
+        query.website = { $exists: true, $nin: [null, '', 'null'] };
       } else {
         query.$or = [
+          { website: { $exists: false } },
           { website: null },
-          { website: '' }
+          { website: '' },
+          { website: 'null' }
         ];
       }
     }
@@ -180,7 +182,7 @@ const addLeadNote = async (req, res, next) => {
  */
 const deleteLead = async (req, res, next) => {
   try {
-    const lead = await Lead.findByIdAndDelete(req.params.id);
+    const lead = await Lead.findByIdAndUpdate(req.params.id, { isDeleted: true }, { new: true });
     if (!lead) {
       res.status(404);
       throw new Error('Lead not found');
@@ -397,11 +399,14 @@ const bulkDeleteLeads = async (req, res, next) => {
       throw new Error('Please provide an array of lead IDs to delete');
     }
 
-    const result = await Lead.deleteMany({ _id: { $in: ids } });
+    const result = await Lead.updateMany(
+      { _id: { $in: ids } },
+      { $set: { isDeleted: true } }
+    );
 
     res.status(200).json({
       success: true,
-      deletedCount: result.deletedCount
+      deletedCount: result.modifiedCount
     });
   } catch (error) {
     next(error);
