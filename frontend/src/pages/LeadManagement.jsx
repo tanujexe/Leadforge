@@ -1,7 +1,136 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Download, Trash2, Eye, Globe, Star, ShieldAlert, Phone, Filter, ChevronLeft, ChevronRight, CheckSquare, Edit, Trash, AlertTriangle, AlertCircle, MapPin } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Search, Download, Trash2, Eye, Globe, Star, ShieldAlert, Phone, Filter, 
+  ChevronLeft, ChevronRight, CheckSquare, Edit, Trash, AlertTriangle, 
+  AlertCircle, MapPin, ChevronDown, Check 
+} from 'lucide-react';
 import { useLeads, useDeleteLead, useBulkUpdateStatus, useBulkAddNote, useBulkDeleteLeads } from '../hooks/useLeads';
 import LeadDrawer from '../components/LeadDrawer';
+
+// Dropdown Options lists
+const webPresenceOptions = [
+  { value: '', label: 'All Web presence' },
+  { value: 'true', label: 'Has Website' },
+  { value: 'false', label: 'No Website' }
+];
+
+const priorityOptions = [
+  { value: '', label: 'All Priorities' },
+  { value: 'High', label: 'High Priority' },
+  { value: 'Medium', label: 'Medium Priority' },
+  { value: 'Low', label: 'Low Priority' }
+];
+
+const webStateOptions = [
+  { value: '', label: 'All Web states' },
+  { value: 'Responsive', label: 'Responsive' },
+  { value: 'Non Responsive', label: 'Non Responsive' },
+  { value: 'Slow', label: 'Slow' },
+  { value: 'Outdated', label: 'Outdated' },
+  { value: 'Offline', label: 'Offline' }
+];
+
+const statusOptions = [
+  { value: '', label: 'All Pipelines' },
+  { value: 'New', label: 'New' },
+  { value: 'Contacted', label: 'Contacted' },
+  { value: 'Follow Up', label: 'Follow Up' },
+  { value: 'Interested', label: 'Interested' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Rejected', label: 'Rejected' }
+];
+
+const categoryOptions = [
+  { value: '', label: 'All Niches' },
+  { value: 'Gym', label: 'Gym & Fitness' },
+  { value: 'Cafe', label: 'Cafe & Coffee' },
+  { value: 'Salon', label: 'Salon & Parlour' },
+  { value: 'Dentist', label: 'Dentist & Dental' },
+  { value: 'Real Estate', label: 'Real Estate' },
+  { value: 'Restaurant', label: 'Restaurant & Dining' },
+  { value: 'Interior Designer', label: 'Interior Designer' },
+  { value: 'Plumber', label: 'Plumber & Piping' },
+  { value: 'Electrician', label: 'Electrician & Power' },
+  { value: 'Spa', label: 'Spa & Wellness' },
+  { value: 'Boutique', label: 'Boutique & Fashion' },
+  { value: 'Bakery', label: 'Bakery & Sweets' },
+  { value: 'Hotel', label: 'Hotel & Lodging' },
+  { value: 'Car Service', label: 'Car Repair & Service' },
+  { value: 'Lawyer', label: 'Lawyer & Law Firm' }
+];
+
+const cityOptions = [
+  { value: '', label: 'All Cities' },
+  { value: 'Bhopal', label: 'Bhopal' },
+  { value: 'Indore', label: 'Indore' },
+  { value: 'Gwalior', label: 'Gwalior' }
+];
+
+const bulkStatusOptions = [
+  { value: '', label: 'Status Update' },
+  { value: 'New', label: 'New' },
+  { value: 'Contacted', label: 'Contacted' },
+  { value: 'Follow Up', label: 'Follow Up' },
+  { value: 'Interested', label: 'Interested' },
+  { value: 'Closed', label: 'Closed' },
+  { value: 'Rejected', label: 'Rejected' }
+];
+
+/**
+ * Compact Custom Select Component for Table Filter Bar & Bulk Actions
+ */
+function CustomFilterSelect({ value, onChange, options, disabled, widthClass = "min-w-[110px]" }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value) || options[0];
+
+  return (
+    <div ref={containerRef} className="relative select-none text-[10px] font-bold">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className={`bg-card hover:bg-elevated/60 border border-border rounded px-2.5 py-1.5 text-text font-semibold flex items-center justify-between gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-all ${widthClass} h-7 shadow-sm`}
+      >
+        <span>{selectedOption ? selectedOption.label : 'Select...'}</span>
+        <ChevronDown size={10} className={`text-text-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-[30px] left-0 bg-[#141b2b] border border-border rounded shadow-2xl z-50 py-1 max-h-48 overflow-y-auto min-w-[140px] backdrop-blur-md bg-opacity-95 divide-y divide-border/20 animate-slide-up-subtle">
+          {options.map((option) => {
+            const isSelected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-2.5 py-1.5 font-semibold flex items-center justify-between transition-all hover:bg-primary/10 hover:text-primary ${isSelected ? 'text-primary bg-primary/5' : 'text-text-secondary'}`}
+              >
+                <span>{option.label}</span>
+                {isSelected && <Check size={10} className="text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LeadManagement() {
   const [search, setSearch] = useState('');
@@ -71,7 +200,7 @@ export default function LeadManagement() {
   };
 
   const handleBulkStatusChange = (newStatus) => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0 || !newStatus) return;
     bulkStatusMutation.mutate(
       { ids: selectedIds, status: newStatus },
       {
@@ -110,9 +239,26 @@ export default function LeadManagement() {
 
   const getExcelExportLink = () => {
     const baseUrl = import.meta.env.VITE_API_URL || '';
-    const path = selectedIds.length > 0
-      ? `/api/export/excel?ids=${selectedIds.join(',')}`
-      : '/api/export/excel';
+    let path = '/api/export/excel';
+    
+    if (selectedIds.length > 0) {
+      path += `?ids=${selectedIds.join(',')}`;
+    } else {
+      const params = new URLSearchParams();
+      if (search.trim()) params.append('search', search.trim());
+      if (hasWebsite) params.append('hasWebsite', hasWebsite);
+      if (opportunityLevel) params.append('opportunityLevel', opportunityLevel);
+      if (websiteStatus) params.append('websiteStatus', websiteStatus);
+      if (status) params.append('status', status);
+      if (category) params.append('category', category);
+      if (city) params.append('city', city);
+      
+      const queryString = params.toString();
+      if (queryString) {
+        path += `?${queryString}`;
+      }
+    }
+    
     return baseUrl ? `${baseUrl}${path}` : path;
   };
 
@@ -148,7 +294,7 @@ export default function LeadManagement() {
             <div>
               <h3 className="text-xs font-bold uppercase tracking-wider">Database Link Connection Lost</h3>
               <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                LeadForge AI was unable to query your local database. This happens if the backend server is offline or MongoDB is not running.
+                ClientScout was unable to query your local database. This happens if the backend server is offline or MongoDB is not running.
               </p>
             </div>
           </div>
@@ -188,12 +334,19 @@ export default function LeadManagement() {
 
           {/* Export link */}
           <a
-            href={error ? '#' : getExcelExportLink()}
-            onClick={(e) => error && e.preventDefault()}
-            target="_blank"
+            href={error || totalLeads === 0 ? '#' : getExcelExportLink()}
+            onClick={(e) => {
+              if (error) {
+                e.preventDefault();
+              } else if (totalLeads === 0) {
+                e.preventDefault();
+                alert('No leads are available to export with the current filters. Please run a scanner search or adjust your filters.');
+              }
+            }}
+            target={error || totalLeads === 0 ? '_self' : '_blank'}
             rel="noreferrer"
             className={`font-bold text-xs px-4 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-              error 
+              error || totalLeads === 0
                 ? 'bg-border text-text-muted cursor-not-allowed opacity-50' 
                 : 'bg-success hover:bg-success/90 text-background'
             }`}
@@ -210,84 +363,53 @@ export default function LeadManagement() {
             <span>Refine Directory:</span>
           </div>
 
-          <select
+          <CustomFilterSelect
             value={hasWebsite}
+            onChange={setHasWebsite}
+            options={webPresenceOptions}
             disabled={!!error}
-            onChange={(e) => setHasWebsite(e.target.value)}
-            className="bg-card border border-border rounded px-2.5 py-1 text-text focus:ring-0 cursor-pointer text-[10px] font-semibold"
-          >
-            <option value="">All Web presence</option>
-            <option value="true">Has Website</option>
-            <option value="false">No Website</option>
-          </select>
+            widthClass="min-w-[130px]"
+          />
 
-          <select
+          <CustomFilterSelect
             value={opportunityLevel}
+            onChange={setOpportunityLevel}
+            options={priorityOptions}
             disabled={!!error}
-            onChange={(e) => setOpportunityLevel(e.target.value)}
-            className="bg-card border border-border rounded px-2.5 py-1 text-text focus:ring-0 cursor-pointer text-[10px] font-semibold"
-          >
-            <option value="">All Priorities</option>
-            <option value="High">High Priority</option>
-            <option value="Medium">Medium Priority</option>
-            <option value="Low">Low Priority</option>
-          </select>
+            widthClass="min-w-[110px]"
+          />
 
-          <select
+          <CustomFilterSelect
             value={websiteStatus}
+            onChange={setWebsiteStatus}
+            options={webStateOptions}
             disabled={!!error}
-            onChange={(e) => setWebsiteStatus(e.target.value)}
-            className="bg-card border border-border rounded px-2.5 py-1 text-text focus:ring-0 cursor-pointer text-[10px] font-semibold"
-          >
-            <option value="">All Web states</option>
-            <option value="Responsive">Responsive</option>
-            <option value="Non Responsive">Non Responsive</option>
-            <option value="Slow">Slow</option>
-            <option value="Outdated">Outdated</option>
-            <option value="Offline">Offline</option>
-          </select>
+            widthClass="min-w-[120px]"
+          />
 
-          <select
+          <CustomFilterSelect
             value={status}
+            onChange={setStatus}
+            options={statusOptions}
             disabled={!!error}
-            onChange={(e) => setStatus(e.target.value)}
-            className="bg-card border border-border rounded px-2.5 py-1 text-text focus:ring-0 cursor-pointer text-[10px] font-semibold"
-          >
-            <option value="">All Pipelines</option>
-            <option value="New">New</option>
-            <option value="Contacted">Contacted</option>
-            <option value="Follow Up">Follow Up</option>
-            <option value="Interested">Interested</option>
-            <option value="Closed">Closed</option>
-            <option value="Rejected">Rejected</option>
-          </select>
+            widthClass="min-w-[110px]"
+          />
 
-          <select
+          <CustomFilterSelect
             value={category}
+            onChange={setCategory}
+            options={categoryOptions}
             disabled={!!error}
-            onChange={(e) => setCategory(e.target.value)}
-            className="bg-card border border-border rounded px-2.5 py-1 text-text focus:ring-0 cursor-pointer text-[10px] font-semibold"
-          >
-            <option value="">All Niches</option>
-            <option value="Gym">Gym</option>
-            <option value="Cafe">Cafe</option>
-            <option value="Salon">Salon</option>
-            <option value="Dentist">Dentist</option>
-            <option value="Real Estate">Real Estate</option>
-            <option value="Restaurant">Restaurant</option>
-          </select>
+            widthClass="min-w-[130px]"
+          />
 
-          <select
+          <CustomFilterSelect
             value={city}
+            onChange={setCity}
+            options={cityOptions}
             disabled={!!error}
-            onChange={(e) => setCity(e.target.value)}
-            className="bg-card border border-border rounded px-2.5 py-1 text-text focus:ring-0 cursor-pointer text-[10px] font-semibold"
-          >
-            <option value="">All Cities</option>
-            <option value="Bhopal">Bhopal</option>
-            <option value="Indore">Indore</option>
-            <option value="Gwalior">Gwalior</option>
-          </select>
+            widthClass="min-w-[100px]"
+          />
 
           {(hasWebsite || opportunityLevel || websiteStatus || status || category || city || search) && (
             <button
@@ -300,7 +422,7 @@ export default function LeadManagement() {
                 setCategory('');
                 setCity('');
               }}
-              className="text-primary hover:underline ml-auto col-span-2 lg:col-auto text-right"
+              className="text-primary hover:underline ml-auto col-span-2 lg:col-auto text-right cursor-pointer"
             >
               Clear Filters
             </button>
@@ -412,13 +534,13 @@ export default function LeadManagement() {
                           <div className="flex items-center justify-end gap-1">
                             <button
                               onClick={() => setSelectedLeadId(lead._id)}
-                              className="bg-elevated hover:bg-border/60 p-1 rounded text-text-secondary hover:text-text"
+                              className="bg-elevated hover:bg-border/60 p-1 rounded text-text-secondary hover:text-text cursor-pointer"
                             >
                               <Eye size={12} />
                             </button>
                             <button
                               onClick={(e) => handleDeleteLead(lead._id, lead.businessName, e)}
-                              className="bg-elevated hover:bg-danger/20 p-1 rounded text-text-secondary hover:text-danger"
+                              className="bg-elevated hover:bg-danger/20 p-1 rounded text-text-secondary hover:text-danger cursor-pointer"
                             >
                               <Trash2 size={12} />
                             </button>
@@ -474,13 +596,13 @@ export default function LeadManagement() {
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setSelectedLeadId(lead._id)}
-                          className="p-1 hover:bg-elevated rounded text-text-secondary hover:text-text"
+                          className="p-1 hover:bg-elevated rounded text-text-secondary hover:text-text cursor-pointer"
                         >
                           <Eye size={14} />
                         </button>
                         <button
                           onClick={(e) => handleDeleteLead(lead._id, lead.businessName, e)}
-                          className="p-1 hover:bg-danger/20 rounded text-text-secondary hover:text-danger"
+                          className="p-1 hover:bg-danger/20 rounded text-text-secondary hover:text-danger cursor-pointer"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -551,7 +673,7 @@ export default function LeadManagement() {
                 <button
                   disabled={page === 1}
                   onClick={() => setPage(prev => Math.max(prev - 1, 1))}
-                  className="bg-card border border-border text-text hover:bg-elevated disabled:opacity-40 p-1 rounded transition-all"
+                  className="bg-card border border-border text-text hover:bg-elevated disabled:opacity-40 p-1 rounded transition-all cursor-pointer"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -561,7 +683,7 @@ export default function LeadManagement() {
                 <button
                   disabled={page === totalPages}
                   onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
-                  className="bg-card border border-border text-text hover:bg-elevated disabled:opacity-40 p-1 rounded transition-all"
+                  className="bg-card border border-border text-text hover:bg-elevated disabled:opacity-40 p-1 rounded transition-all cursor-pointer"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -580,41 +702,30 @@ export default function LeadManagement() {
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
-            <select
-              onChange={(e) => {
-                if (e.target.value) {
-                  handleBulkStatusChange(e.target.value);
-                  e.target.value = '';
-                }
-              }}
-              className="bg-card border border-border rounded text-[10px] font-bold uppercase tracking-wider px-2 py-1 focus:ring-0 text-text cursor-pointer h-7"
-            >
-              <option value="">Status Update</option>
-              <option value="New">New</option>
-              <option value="Contacted">Contacted</option>
-              <option value="Follow Up">Follow Up</option>
-              <option value="Interested">Interested</option>
-              <option value="Closed">Closed</option>
-              <option value="Rejected">Rejected</option>
-            </select>
+            <CustomFilterSelect
+              value=""
+              onChange={handleBulkStatusChange}
+              options={bulkStatusOptions}
+              widthClass="min-w-[130px]"
+            />
 
             <button
               onClick={handleBulkAddNote}
-              className="bg-card hover:bg-border/60 border border-border text-text font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1"
+              className="bg-card hover:bg-border/60 border border-border text-text font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1 cursor-pointer"
             >
               <span>Log Note</span>
             </button>
 
             <button
               onClick={handleBulkDelete}
-              className="bg-danger/10 hover:bg-danger/20 border border-danger/20 text-danger font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1"
+              className="bg-danger/10 hover:bg-danger/20 border border-danger/20 text-danger font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1 cursor-pointer"
             >
               <span>Delete</span>
             </button>
 
             <button
               onClick={() => setSelectedIds([])}
-              className="text-text-muted hover:text-text font-bold text-[9px] uppercase tracking-wider px-1.5 h-7"
+              className="text-text-muted hover:text-text font-bold text-[9px] uppercase tracking-wider px-1.5 h-7 cursor-pointer"
             >
               Deselect
             </button>
