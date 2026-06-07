@@ -196,7 +196,7 @@ const deleteLead = async (req, res, next) => {
 };
 
 /**
- * Manually trigger Playwright audit refresh (uses 7-day cache by default)
+ * Manually trigger website audit refresh (uses 7-day cache by default)
  */
 const manuallyAuditLeadWebsite = async (req, res, next) => {
   try {
@@ -224,7 +224,7 @@ const manuallyAuditLeadWebsite = async (req, res, next) => {
       });
     }
 
-    console.log(`[Manual Audit] Re-running Playwright crawler for: "${lead.businessName}"`);
+    console.log(`[Manual Audit] Re-running website crawler for: "${lead.businessName}"`);
     const auditResult = await auditWebsite(lead.website, lead._id);
 
     lead.audit = auditResult;

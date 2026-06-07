@@ -109,7 +109,7 @@ async function runSearchWorker(searchId, businessType, location) {
         // Pre-generate Lead ID to name screenshot files
         const leadId = new mongoose.Types.ObjectId();
 
-        // Run Playwright audit if website exists (or reuse mock audit if demo lead)
+        // Run website audit if website exists (or reuse mock audit if demo lead)
         let auditResult = null;
         if (biz.website) {
           if (biz.isDemo) {

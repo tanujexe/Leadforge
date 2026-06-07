@@ -46,7 +46,7 @@ Here is a breakdown of the technologies used, explained for both non-tech and te
 ### 4. Smart Integrations (Third-Party Services)
 *The specialized tools that perform the heavy lifting like scraping, auditing, and AI writing.*
 * **Apify (Google Maps Scraper)**: Automatically searches Google Maps to find business details, ratings, reviews, and website URLs.
-* **Playwright**: A virtual web browser that visits the business's website in the background to test its loading speed, SEO tags, and mobile layout.
+* **Lightweight HTML Fetch & Parser**: A high-speed native network fetcher that crawls a business's homepage in milliseconds and inspects its HTML structure (viewport tags, h1 structure, meta descriptions, image alternative tags) using regular expressions, eliminating the need for slow, heavy browser packages.
 * **Groq AI (Outreach Pitch Writer)**: An artificial intelligence service (similar to ChatGPT) that instantly drafts highly personalized, professional emails tailored to the specific business and its website problems.
 * **ExcelJS**: Generates clean, formatted spreadsheets so you can download and open your lead lists in Microsoft Excel or Google Sheets.
 
@@ -147,7 +147,6 @@ Open your terminal at the project root folder:
 ```bash
 cd backend
 npm install
-npx playwright install chromium
 npm run dev
 ```
 The backend server will start running at `http://localhost:5000`.
