@@ -1,8 +1,128 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Play, Eye, AlertOctagon, HelpCircle } from 'lucide-react';
+import { 
+  Terminal, Play, Eye, AlertOctagon, HelpCircle, 
+  ChevronDown, Check, Dumbbell, Coffee, Sparkles, 
+  Stethoscope, Home, Utensils, Paintbrush, Wrench, 
+  Zap, Flower, Shirt, Cake, Bed, Car, Scale, MapPin 
+} from 'lucide-react';
 import { useStartSearch } from '../hooks/useLeads';
 import { searchService } from '../services/api';
 import LeadDrawer from '../components/LeadDrawer';
+
+// Map of niches to their respective Lucide icons
+const categoryIcons = {
+  'Gym': Dumbbell,
+  'Cafe': Coffee,
+  'Salon': Sparkles,
+  'Dentist': Stethoscope,
+  'Real Estate': Home,
+  'Restaurant': Utensils,
+  'Interior Designer': Paintbrush,
+  'Plumber': Wrench,
+  'Electrician': Zap,
+  'Spa': Flower,
+  'Boutique': Shirt,
+  'Bakery': Cake,
+  'Hotel': Bed,
+  'Car Service': Car,
+  'Lawyer': Scale
+};
+
+const categories = [
+  { value: 'Gym', label: 'Gym & Fitness' },
+  { value: 'Cafe', label: 'Cafe & Coffee' },
+  { value: 'Salon', label: 'Salon & Parlour' },
+  { value: 'Dentist', label: 'Dentist & Dental' },
+  { value: 'Real Estate', label: 'Real Estate' },
+  { value: 'Restaurant', label: 'Restaurant & Dining' },
+  { value: 'Interior Designer', label: 'Interior Designer' },
+  { value: 'Plumber', label: 'Plumber & Piping' },
+  { value: 'Electrician', label: 'Electrician & Power' },
+  { value: 'Spa', label: 'Spa & Wellness' },
+  { value: 'Boutique', label: 'Boutique & Fashion' },
+  { value: 'Bakery', label: 'Bakery & Sweets' },
+  { value: 'Hotel', label: 'Hotel & Lodging' },
+  { value: 'Car Service', label: 'Car Repair & Service' },
+  { value: 'Lawyer', label: 'Lawyer & Law Firm' }
+];
+
+const cities = [
+  { value: 'Bhopal', label: 'Bhopal' },
+  { value: 'Indore', label: 'Indore' },
+  { value: 'Gwalior', label: 'Gwalior' }
+];
+
+/**
+ * Beautiful Glassmorphic Custom Select Component
+ */
+function CustomSelect({ label, value, onChange, options, iconsMap, placeholder, disabled, icon: DefaultIcon }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(opt => opt.value === value);
+  const SelectedIcon = selectedOption && iconsMap ? iconsMap[selectedOption.value] : null;
+
+  return (
+    <div ref={containerRef} className="w-full md:flex-1 space-y-1.5 relative select-none">
+      <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{label}</label>
+      
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-background hover:bg-elevated/40 border border-border rounded-lg px-3.5 py-2 text-xs text-text font-semibold flex items-center justify-between cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed h-9 shadow-sm"
+      >
+        <div className="flex items-center gap-2">
+          {SelectedIcon ? (
+            <SelectedIcon size={14} className="text-primary animate-pulse-subtle" />
+          ) : DefaultIcon ? (
+            <DefaultIcon size={14} className="text-text-secondary" />
+          ) : null}
+          <span className={selectedOption ? "text-text font-semibold" : "text-text-muted font-medium"}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown size={14} className={`text-text-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-[64px] left-0 right-0 bg-[#141b2b] border border-border rounded-lg shadow-2xl z-50 py-1 max-h-60 overflow-y-auto divide-y divide-border/20 backdrop-blur-md bg-opacity-95 animate-slide-up-subtle">
+          {options.map((option) => {
+            const OptionIcon = iconsMap ? iconsMap[option.value] : null;
+            const isSelected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3.5 py-2.5 text-xs font-semibold flex items-center justify-between transition-all hover:bg-primary/10 hover:text-primary ${isSelected ? 'text-primary bg-primary/5' : 'text-text-secondary'}`}
+              >
+                <div className="flex items-center gap-2.5">
+                  {OptionIcon && <OptionIcon size={14} className={isSelected ? "text-primary" : "text-text-muted"} />}
+                  <span>{option.label}</span>
+                </div>
+                {isSelected && <Check size={12} className="text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function LeadSearch() {
   const startSearchMutation = useStartSearch();
@@ -50,9 +170,9 @@ export default function LeadSearch() {
           newLogs.push(`${timestamp()} 🌐 Scraper running in cloud workspace. Gathering coordinates, reviews, and website listings...`);
         }
 
-        if (data.status === 'Auditing' && !logs.some(l => l.includes('Playwright Browser'))) {
-          newLogs.push(`${timestamp()} 📥 Scrape completed. Found ${data.leadCount} businesses.`)
-          newLogs.push(`${timestamp()} 🤖 Bootstrapping Playwright browser cluster...`);
+        if (data.status === 'Auditing' && !logs.some(l => l.includes('Crawler Engine'))) {
+          newLogs.push(`${timestamp()} 📥 Scrape completed. Found ${data.leadCount} businesses.`);
+          newLogs.push(`${timestamp()} 🤖 Bootstrapping lightweight crawler engine...`);
           newLogs.push(`${timestamp()} 🔎 Commencing website audits: testing HTTPS, page responsive viewports, and FCP load speed...`);
         }
 
@@ -101,7 +221,7 @@ export default function LeadSearch() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    if (!businessType.trim() || !location.trim()) return;
+    if (!businessType || !location) return;
 
     setSetupError(null);
     setLogs([]);
@@ -110,17 +230,16 @@ export default function LeadSearch() {
 
     const t = `[${new Date().toLocaleTimeString()}]`;
     setLogs([
-      `${t} 🚀 Dispatching LeadForge Scan Query...`,
+      `${t} 🚀 Dispatching ClientScout Scan Query...`,
       `${t} 🔎 Business Type: "${businessType}"`,
       `${t} 📍 Location: "${location}"`,
       `${t} 📬 Request received by backend queue.`
     ]);
 
     startSearchMutation.mutate(
-      { businessType: businessType.trim(), location: location.trim() },
+      { businessType, location },
       {
         onSuccess: (res) => {
-          // Check for API credentials warnings
           if (res.success && res.data?.searchId) {
             setActiveSearchId(res.data.searchId);
           }
@@ -214,45 +333,32 @@ export default function LeadSearch() {
         </div>
 
         <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4 mt-5 md:items-end">
-          <div className="w-full md:flex-1 space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted">Business Category (Niche)</label>
-            <select
-              required
-              disabled={!!activeSearchId}
-              value={businessType}
-              onChange={(e) => setBusinessType(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-xs text-text font-semibold cursor-pointer select-none"
-            >
-              <option value="">Select Niche...</option>
-              <option value="Gym">Gym</option>
-              <option value="Cafe">Cafe</option>
-              <option value="Salon">Salon</option>
-              <option value="Dentist">Dentist</option>
-              <option value="Real Estate">Real Estate</option>
-              <option value="Restaurant">Restaurant</option>
-            </select>
-          </div>
+          
+          <CustomSelect
+            label="Business Category (Niche)"
+            value={businessType}
+            onChange={setBusinessType}
+            options={categories}
+            iconsMap={categoryIcons}
+            placeholder="Select Niche..."
+            disabled={!!activeSearchId}
+            icon={HelpCircle}
+          />
 
-          <div className="w-full md:flex-1 space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-text-muted">City / Location</label>
-            <select
-              required
-              disabled={!!activeSearchId}
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full bg-background border border-border rounded-lg px-3.5 py-2 text-xs text-text font-semibold cursor-pointer select-none"
-            >
-              <option value="">Select City...</option>
-              <option value="Bhopal">Bhopal</option>
-              <option value="Indore">Indore</option>
-              <option value="Gwalior">Gwalior</option>
-            </select>
-          </div>
+          <CustomSelect
+            label="City / Location"
+            value={location}
+            onChange={setLocation}
+            options={cities}
+            placeholder="Select City..."
+            disabled={!!activeSearchId}
+            icon={MapPin}
+          />
 
           <button
             type="submit"
-            disabled={startSearchMutation.isPending || !!activeSearchId}
-            className="w-full md:w-auto bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-text font-bold text-xs px-5 py-2 rounded-lg flex items-center justify-center gap-2 h-9 transition-all"
+            disabled={startSearchMutation.isPending || !!activeSearchId || !businessType || !location}
+            className="w-full md:w-auto bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-text font-bold text-xs px-5 py-2 rounded-lg flex items-center justify-center gap-2 h-9 transition-all cursor-pointer"
           >
             {activeSearchId ? (
               <span className="w-3.5 h-3.5 rounded-full border border-text border-t-transparent animate-spin"></span>
@@ -350,7 +456,7 @@ export default function LeadSearch() {
                       <td className="py-2.5 px-3 text-right">
                         <button
                           onClick={() => setSelectedLeadId(lead._id)}
-                          className="bg-elevated hover:bg-border/60 p-1 rounded text-text-secondary hover:text-text flex items-center justify-center ml-auto"
+                          className="bg-elevated hover:bg-border/60 p-1 rounded text-text-secondary hover:text-text flex items-center justify-center ml-auto cursor-pointer"
                           title="Open Dossier"
                         >
                           <Eye size={12} />
