@@ -109,10 +109,11 @@ export default function LeadManagement() {
   };
 
   const getExcelExportLink = () => {
-    if (selectedIds.length > 0) {
-      return `/api/export/excel?ids=${selectedIds.join(',')}`;
-    }
-    return '/api/export/excel';
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const path = selectedIds.length > 0
+      ? `/api/export/excel?ids=${selectedIds.join(',')}`
+      : '/api/export/excel';
+    return baseUrl ? `${baseUrl}${path}` : path;
   };
 
   const getOppBadgeColor = (level) => {
