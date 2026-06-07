@@ -22,16 +22,15 @@ async function searchGoogleMaps(businessType, location) {
 
     // Input parameters optimized for speed and token budget
     const input = {
-      queries: [query],
+      searchStringsArray: [query],
       maxCrawledPlacesPerSearch: 20, // Clamps results for local performance
-      exportPlaceUrls: false,
-      includeReviews: false, // Disabling reviews speeds up execution significantly
-      includeImages: false,
+      maxReviews: 0, // Disabling reviews speeds up execution significantly
+      maxImages: 0,
       language: 'en'
     };
 
     // Run the actor
-    const run = await client.actor('apify/google-maps-scraper').call(input);
+    const run = await client.actor('compass/crawler-google-places').call(input);
     
     // Fetch result items
     const { items } = await client.dataset(run.defaultDatasetId).listItems();

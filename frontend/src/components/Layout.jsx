@@ -2,6 +2,33 @@ import React, { useState } from 'react';
 import { BarChart2, Search, Database, Menu, X } from 'lucide-react';
 import { useAppConfig } from '../hooks/useLeads';
 
+const LogoIcon = ({ className = "w-9 h-9" }) => (
+  <svg 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <path 
+      d="M 14.5 7.5 A 5 5 0 1 0 14.5 14.5 M 14.5 14.5 L 19.5 19.5" 
+      stroke="currentColor" 
+      strokeWidth="2.2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round"
+    />
+    <text 
+      x="10.8" 
+      y="11.2" 
+      fill="#3B82F6" 
+      fontFamily="Outfit, 'Space Grotesk', Inter, system-ui, sans-serif" 
+      fontSize="7.5" 
+      fontWeight="900" 
+      textAnchor="middle" 
+      dominantBaseline="central"
+    >S</text>
+  </svg>
+);
+
 export default function Layout({ activeTab, setActiveTab, children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: config } = useAppConfig();
@@ -23,8 +50,8 @@ export default function Layout({ activeTab, setActiveTab, children }) {
       {/* Mobile Header (Hidden on Desktop) */}
       <header className="h-16 lg:hidden border-b border-border bg-card px-4 flex items-center justify-between select-none">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" className="w-9 h-9 object-contain" alt="LeadForge Logo" />
-          <span className="font-brand font-black tracking-tight text-xl bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent">LeadForge AI</span>
+          <LogoIcon className="w-8 h-8" />
+          <span className="font-display font-black tracking-widest uppercase text-base text-[#F8FAFC]">CLIENT<span className="text-[#3B82F6]">SCOUT</span></span>
         </div>
         
         <button 
@@ -40,10 +67,9 @@ export default function Layout({ activeTab, setActiveTab, children }) {
         <div>
           {/* Logo Header */}
           <div className="h-20 px-6 border-b border-border flex items-center gap-3.5">
-            <img src="/logo.png" className="w-11 h-11 object-contain" alt="LeadForge Logo" />
+            <LogoIcon className="w-9 h-9" />
             <div className="flex flex-col justify-center">
-              <span className="font-brand font-black tracking-tight text-[21px] bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent leading-none">LeadForge AI</span>
-              <span className="text-[9px] text-text-muted font-mono uppercase tracking-widest mt-1.5 leading-none">Agency Workstation</span>
+              <span className="font-display font-black tracking-widest uppercase text-[17px] text-[#F8FAFC] leading-none">CLIENT<span className="text-[#3B82F6]">SCOUT</span></span>
             </div>
           </div>
 
@@ -107,8 +133,8 @@ export default function Layout({ activeTab, setActiveTab, children }) {
             <div>
               <div className="h-16 px-4 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <img src="/logo.png" className="w-9 h-9 object-contain" alt="LeadForge Logo" />
-                  <span className="font-brand font-black tracking-tight text-xl bg-gradient-to-r from-blue-400 via-cyan-400 to-indigo-400 bg-clip-text text-transparent">LeadForge AI</span>
+                  <LogoIcon className="w-8 h-8" />
+                  <span className="font-display font-black tracking-widest uppercase text-base text-[#F8FAFC]">CLIENT<span className="text-[#3B82F6]">SCOUT</span></span>
                 </div>
                 <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 hover:bg-elevated rounded border border-border/40 text-text-secondary hover:text-text transition-all">
                   <X size={16} />

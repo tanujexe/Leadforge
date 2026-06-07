@@ -15,7 +15,6 @@ function normalizeUrl(url) {
 
 /**
  * Conducts a website audit on a target URL using lightweight fetch & HTML regex parsing.
- * Eliminates Playwright browser dependencies for easy and lightweight deployment.
  * @param {string} rawUrl - Website to audit
  * @param {string} leadId - Database ID of the lead to name screenshots
  */
@@ -48,6 +47,11 @@ async function auditWebsite(rawUrl, leadId) {
     const isHttps = finalUrl.startsWith('https://');
     const status = response.status;
 
+    // Read security headers from response (case-insensitive keys)
+    const hasHsts = response.headers.get('strict-transport-security') !== null;
+    const hasXFrame = response.headers.get('x-frame-options') !== null;
+    const hasCsp = response.headers.get('content-security-policy') !== null;
+
     if (status >= 400) {
       return {
         websiteScore: 10,
@@ -62,14 +66,24 @@ async function auditWebsite(rawUrl, leadId) {
 
     const html = await response.text();
 
-    // 1. Check Mobile Responsiveness via Viewport tag
+    // 1. Check Mobile Responsiveness via Viewport tag and style inspection
     let isMobileResponsive = false;
+    let responsiveWarning = false;
     const viewportMatch = html.match(/<meta[^>]+name=["']viewport["'][^>]*>/i) || 
                           html.match(/<meta[^>]+content=["'][^"']*viewport[^"']*["'][^>]*>/i);
     if (viewportMatch) {
       const contentMatch = viewportMatch[0].match(/content=["']([^"']+)["']/i);
       if (contentMatch && contentMatch[1].includes('width=device-width')) {
-        isMobileResponsive = true;
+        // Viewport tag exists. Now verify if styling/media queries are present
+        const hasInlineMedia = /@media/i.test(html);
+        const hasExternalStylesheets = /<link[^>]+rel=["']stylesheet["']/i.test(html);
+
+        if (hasInlineMedia || hasExternalStylesheets) {
+          isMobileResponsive = true;
+        } else {
+          isMobileResponsive = false;
+          responsiveWarning = true;
+        }
       }
     }
 
@@ -114,10 +128,25 @@ async function auditWebsite(rawUrl, leadId) {
       issues.push('Website does not use secure HTTPS protocol');
     }
     if (!isMobileResponsive) {
-      issues.push('Missing mobile-responsive viewport meta tag');
+      if (responsiveWarning) {
+        issues.push('Viewport tag exists, but no responsive CSS @media rules or stylesheets were detected');
+      } else {
+        issues.push('Missing mobile-responsive viewport meta tag');
+      }
     }
     if (responseTimeMs > 2500) {
       issues.push(`Slow page load speed (response time: ${(responseTimeMs / 1000).toFixed(1)}s)`);
+    }
+
+    // Security header validation warnings
+    if (!hasHsts) {
+      issues.push('Missing Strict-Transport-Security (HSTS) security header');
+    }
+    if (!hasXFrame) {
+      issues.push('Missing X-Frame-Options security header (vulnerable to clickjacking)');
+    }
+    if (!hasCsp) {
+      issues.push('Missing Content-Security-Policy (CSP) security header');
     }
 
     // Calculate score out of 100
@@ -136,6 +165,13 @@ async function auditWebsite(rawUrl, leadId) {
     if (h1Count > 0) score += 10;
     if (totalImages === 0 || imagesWithoutAlt / totalImages < 0.3) score += 5;
 
+    // Deduct points for missing security headers (down to a minimum of 0)
+    let securityDeductions = 0;
+    if (!hasHsts) securityDeductions += 2;
+    if (!hasXFrame) securityDeductions += 2;
+    if (!hasCsp) securityDeductions += 2;
+    score = Math.max(0, score - securityDeductions);
+
     // Categorize websiteStatus
     let websiteStatus = 'Responsive';
     if (!isMobileResponsive) {
@@ -146,39 +182,9 @@ async function auditWebsite(rawUrl, leadId) {
       websiteStatus = 'Outdated';
     }
 
-    // 3. Media Screenshot Engine Workflow (Placeholder Copy)
-    let screenshotFull = null;
-    let screenshotThumb = null;
-
-    if (leadId) {
-      try {
-        const screenshotDir = path.join(__dirname, '../../public/screenshots');
-        if (!fs.existsSync(screenshotDir)) {
-          fs.mkdirSync(screenshotDir, { recursive: true });
-        }
-
-        const demoFullFilePath = path.join(screenshotDir, 'demo_full.png');
-        const demoThumbFilePath = path.join(screenshotDir, 'demo_thumb.png');
-        
-        const fullFileName = `${leadId}_full.png`;
-        const thumbFileName = `${leadId}_thumb.png`;
-        const fullFilePath = path.join(screenshotDir, fullFileName);
-        const thumbFilePath = path.join(screenshotDir, thumbFileName);
-
-        // Copy placeholder images if they exist
-        if (fs.existsSync(demoFullFilePath)) {
-          fs.copyFileSync(demoFullFilePath, fullFilePath);
-        }
-        if (fs.existsSync(demoThumbFilePath)) {
-          fs.copyFileSync(demoThumbFilePath, thumbFilePath);
-        }
-
-        screenshotFull = `/screenshots/${fullFileName}`;
-        screenshotThumb = `/screenshots/${thumbFileName}`;
-      } catch (err) {
-        console.error('[Screenshot Engine] Internal process error:', err.message);
-      }
-    }
+    // 3. Media Screenshot Engine Workflow - Disabled
+    const screenshotFull = null;
+    const screenshotThumb = null;
 
     return {
       websiteScore: score,

@@ -11,7 +11,7 @@ function formatNotes(notes) {
 }
 
 /**
- * Formats a single lead object into a row array matching columns
+ * Formats a single lead object into a row array matching columns (excluding Groq AI pitches)
  */
 function leadToRow(lead) {
   return [
@@ -28,12 +28,6 @@ function leadToRow(lead) {
     lead.websiteScore || 0,
     lead.websiteStatus || 'No Website',
     lead.status || 'New',
-    lead.aiSummary || '',
-    lead.aiReason || '',
-    lead.callPitch || '',
-    lead.whatsappPitch || '',
-    lead.emailPitch || '',
-    lead.meetingPitch || '',
     formatNotes(lead.notes)
   ];
 }
@@ -44,7 +38,7 @@ function leadToRow(lead) {
 function addStyledSheet(workbook, sheetName, leads) {
   const sheet = workbook.addWorksheet(sheetName);
 
-  // Setup Columns
+  // Setup Columns (Excludes Groq AI pitch columns)
   sheet.columns = [
     { header: 'Business Name', key: 'businessName', width: 25 },
     { header: 'Phone Number', key: 'phone', width: 18 },
@@ -59,12 +53,6 @@ function addStyledSheet(workbook, sheetName, leads) {
     { header: 'Website Score (0-100)', key: 'websiteScore', width: 20 },
     { header: 'Website Status', key: 'websiteStatus', width: 18 },
     { header: 'Outreach Status', key: 'status', width: 15 },
-    { header: 'AI Business Summary', key: 'aiSummary', width: 40 },
-    { header: 'AI Opportunity Reason', key: 'aiReason', width: 45 },
-    { header: 'Call Script Pitch', key: 'callPitch', width: 40 },
-    { header: 'WhatsApp Pitch', key: 'whatsappPitch', width: 40 },
-    { header: 'Email Pitch Outreach', key: 'emailPitch', width: 45 },
-    { header: 'Detailed Meeting Pitch', key: 'meetingPitch', width: 45 },
     { header: 'User Notes', key: 'notes', width: 30 }
   ];
 
@@ -74,12 +62,6 @@ function addStyledSheet(workbook, sheetName, leads) {
     
     // Enable text wrapping for long text columns
     row.getCell('address').alignment = { wrapText: true, vertical: 'top' };
-    row.getCell('aiSummary').alignment = { wrapText: true, vertical: 'top' };
-    row.getCell('aiReason').alignment = { wrapText: true, vertical: 'top' };
-    row.getCell('callPitch').alignment = { wrapText: true, vertical: 'top' };
-    row.getCell('whatsappPitch').alignment = { wrapText: true, vertical: 'top' };
-    row.getCell('emailPitch').alignment = { wrapText: true, vertical: 'top' };
-    row.getCell('meetingPitch').alignment = { wrapText: true, vertical: 'top' };
     row.getCell('notes').alignment = { wrapText: true, vertical: 'top' };
 
     // Align numeric and status cells
@@ -138,10 +120,10 @@ function addStyledSheet(workbook, sheetName, leads) {
     };
   });
 
-  // Enable Auto-Filters
+  // Enable Auto-Filters (14 columns total)
   sheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: leads.length + 1, column: 20 }
+    to: { row: leads.length + 1, column: 14 }
   };
 }
 
@@ -150,7 +132,7 @@ function addStyledSheet(workbook, sheetName, leads) {
  */
 async function generateExcelBuffer(leads) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'LeadForge AI';
+  workbook.creator = 'ClientScout';
   workbook.created = new Date();
 
   // Filters for sheets

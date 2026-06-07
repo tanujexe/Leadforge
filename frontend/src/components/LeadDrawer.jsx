@@ -233,28 +233,6 @@ export default function LeadDrawer({ leadId, onClose }) {
                     </span>
                   </div>
 
-                  {/* Screenshots Preview Section */}
-                  {lead.screenshotThumb && (
-                    <div className="border border-border rounded-lg overflow-hidden relative group">
-                      <img 
-                        src={lead.screenshotThumb} 
-                        alt="Audit preview" 
-                        className="w-full h-36 object-cover object-top opacity-85 group-hover:opacity-100 transition-opacity"
-                      />
-                      <div className="absolute inset-0 bg-background/30 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
-                        <a 
-                          href={lead.screenshotFull} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          className="bg-card border border-border px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-text hover:bg-elevated transition-all"
-                        >
-                          <Eye size={12} />
-                          <span>View Full Screenshot</span>
-                        </a>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Indicators */}
                   {lead.audit && (
                     <div className="grid grid-cols-2 gap-2 text-xs border-t border-border pt-3">
