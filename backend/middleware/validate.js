@@ -56,7 +56,8 @@ const searchSchema = z.object({
     location: z.string({ required_error: 'Location is required' })
       .trim()
       .min(2, { message: 'Location must be at least 2 characters' })
-      .max(100, { message: 'Location cannot exceed 100 characters' })
+      .max(100, { message: 'Location cannot exceed 100 characters' }),
+    limit: z.preprocess((val) => (val === undefined ? undefined : Number(val)), z.number().int().min(1).max(200)).optional()
   })
 });
 

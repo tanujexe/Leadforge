@@ -10,7 +10,8 @@ const { correctBusinessType } = require('../utils/typoCorrector');
 /**
  * Background worker task executing Google Maps searches, auditing, and AI synthesis
  */
-async function runSearchWorker(searchId, businessType, location) {
+async function runSearchWorker(searchId, businessType, location, limit = 30) {
+  const startTime = Date.now();
   try {
     // Check for duplicate search queries in the last 7 days (Case-Insensitive)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -36,16 +37,23 @@ async function runSearchWorker(searchId, businessType, location) {
         
         // Link existing leads to the new search query
         for (const lead of leadsToReuse) {
-          lead.searchQueryId = searchId;
-          await lead.save();
+          if (!lead.searchQueryId.includes(searchId)) {
+            lead.searchQueryId.push(searchId);
+            await lead.save();
+          }
         }
-      }
 
-      await SearchQuery.findByIdAndUpdate(searchId, { 
-        status: 'Completed', 
-        leadCount: leadsToReuse.length 
-      });
-      return;
+        await SearchQuery.findByIdAndUpdate(searchId, { 
+          status: 'Completed', 
+          leadCount: leadsToReuse.length,
+          rawDiscoveredCount: leadsToReuse.length,
+          creditsUsed: 0,
+          durationMs: Date.now() - startTime
+        });
+        return;
+      } else {
+        console.log('[Search Worker] Duplicate queries found, but they contain 0 leads. Bypassing reuse and running a fresh scrape.');
+      }
     }
 
     // 1. Scraping google maps listings or generating mock demo leads
@@ -53,17 +61,27 @@ async function runSearchWorker(searchId, businessType, location) {
     
     const isDemoMode = process.env.DEVELOPMENT_MODE === 'true';
     let discoveredBusinesses = [];
+    let creditsUsed = 0;
 
     if (isDemoMode) {
-      console.log(`[Search Worker] DEVELOPMENT_MODE is active. Generating mock leads for: "${businessType}" in "${location}"`);
+      console.log(`[Search Worker] DEVELOPMENT_MODE is active. Generating mock leads for: "${businessType}" in "${location}" (Limit: ${limit})`);
       const { generateDemoLeads } = require('../utils/demoGenerator');
-      discoveredBusinesses = generateDemoLeads(businessType, location);
+      discoveredBusinesses = generateDemoLeads(businessType, location, limit);
+      creditsUsed = 0;
     } else {
-      discoveredBusinesses = await searchGoogleMaps(businessType, location);
+      const apifyRes = await searchGoogleMaps(businessType, location, limit);
+      discoveredBusinesses = apifyRes.leads;
+      creditsUsed = apifyRes.computeUnits;
     }
     
     if (!discoveredBusinesses || discoveredBusinesses.length === 0) {
-      await SearchQuery.findByIdAndUpdate(searchId, { status: 'Completed', leadCount: 0 });
+      await SearchQuery.findByIdAndUpdate(searchId, { 
+        status: 'Completed', 
+        leadCount: 0,
+        rawDiscoveredCount: 0,
+        creditsUsed,
+        durationMs: Date.now() - startTime
+      });
       return;
     }
 
@@ -101,8 +119,10 @@ async function runSearchWorker(searchId, businessType, location) {
         // If lead already exists, link to query and SKIP expensive API calls
         if (existingLead) {
           console.log(`[Search Worker] Business already exists: "${biz.businessName}". Linking and skipping API calls.`);
-          existingLead.searchQueryId = searchId;
-          await existingLead.save();
+          if (!existingLead.searchQueryId.includes(searchId)) {
+            existingLead.searchQueryId.push(searchId);
+            await existingLead.save();
+          }
           processedCount++;
           continue;
         }
@@ -134,11 +154,11 @@ async function runSearchWorker(searchId, businessType, location) {
           phone: biz.phone || '',
           website: biz.website || null,
           address: biz.address || '',
-          googleMapsUrl: biz.googleMapsUrl || '',
+          googleMapsUrl: biz.googleMapsUrl || undefined,
           rating: biz.rating || 0,
           reviewCount: biz.reviewCount || 0,
           category: biz.category || businessType,
-          searchQueryId: searchId,
+          searchQueryId: [searchId],
           websiteScore: auditResult.websiteScore,
           websiteStatus: auditResult.websiteStatus,
           screenshotFull: auditResult.screenshotFull || null,
@@ -167,18 +187,26 @@ async function runSearchWorker(searchId, businessType, location) {
 
         // Persist new Lead to MongoDB
         await lead.save();
+        processedCount++;
       } catch (err) {
         console.error(`[Search Worker] Error processing: "${biz.businessName}":`, err.message);
       }
-      
-      processedCount++;
     }
 
     // Set search completed
-    await SearchQuery.findByIdAndUpdate(searchId, { status: 'Completed', leadCount: processedCount });
+    await SearchQuery.findByIdAndUpdate(searchId, { 
+      status: 'Completed', 
+      leadCount: processedCount,
+      rawDiscoveredCount: discoveredBusinesses.length,
+      creditsUsed,
+      durationMs: Date.now() - startTime
+    });
   } catch (error) {
     console.error('[Search Worker] Background search failed:', error.message);
-    await SearchQuery.findByIdAndUpdate(searchId, { status: 'Failed' });
+    await SearchQuery.findByIdAndUpdate(searchId, { 
+      status: 'Failed',
+      durationMs: Date.now() - startTime
+    });
   }
 }
 
@@ -187,7 +215,7 @@ async function runSearchWorker(searchId, businessType, location) {
  */
 const createSearch = async (req, res, next) => {
   try {
-    const { businessType: rawBusinessType, location } = req.body;
+    const { businessType: rawBusinessType, location, limit } = req.body;
     if (!rawBusinessType || !location) {
       res.status(400);
       throw new Error('Please provide both businessType and location');
@@ -225,11 +253,12 @@ const createSearch = async (req, res, next) => {
     const searchQuery = await SearchQuery.create({
       businessType: businessType.trim(),
       location: location.trim(),
-      status: 'Pending'
+      status: 'Pending',
+      limit: limit || 30
     });
 
     // Run background worker asynchronously
-    runSearchWorker(searchQuery._id, businessType.trim(), location.trim());
+    runSearchWorker(searchQuery._id, businessType.trim(), location.trim(), limit);
 
     res.status(202).json({
       success: true,
@@ -279,7 +308,7 @@ const getSearchQueryStatus = async (req, res, next) => {
  */
 const getRecentSearches = async (req, res, next) => {
   try {
-    const history = await SearchQuery.find().sort({ createdAt: -1 }).limit(10);
+    const history = await SearchQuery.find().sort({ createdAt: -1 }).limit(100);
     res.status(200).json({
       success: true,
       data: history

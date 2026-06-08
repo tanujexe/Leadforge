@@ -13,17 +13,69 @@ const getAllLeads = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 50;
     const skip = (page - 1) * limit;
 
-    const { search, hasWebsite, opportunityLevel, status, websiteStatus, category, city } = req.query;
+    const { search, hasWebsite, opportunityLevel, status, websiteStatus, category, city, quickFilter, searchQueryId } = req.query;
     
     // Build query object (filter out soft-deleted leads)
     let query = { isDeleted: { $ne: true } };
 
-    // 1. Full-text search using MongoDB Text Index
+    // 1. Partial substring search using regex across key fields
     if (search) {
-      query.$text = { $search: search };
+      const searchRegex = new RegExp(search.trim(), 'i');
+      query.$or = [
+        { businessName: { $regex: searchRegex } },
+        { phone: { $regex: searchRegex } },
+        { address: { $regex: searchRegex } },
+        { category: { $regex: searchRegex } }
+      ];
     }
 
-    // 2. Filter: Has Website
+    // 2. Filter: Category (Niche)
+    if (category) {
+      const categoryRegexMap = {
+        'Gym': /gym|fitness|health|trainer/i,
+        'Cafe': /cafe|coffee|bakery|coffe/i,
+        'Salon': /salon|spa|beauty|hair|parlour/i,
+        'Dentist': /dentist|dental|dent|orthodont/i,
+        'Real Estate': /real estate|property|estate|realtor/i,
+        'Restaurant': /restaurant|eatery|dining|food|kitchen|bites|grill/i,
+        'Interior Designer': /interior|designer|design/i,
+        'Plumber': /plumber|plumbing|pipe|piping/i,
+        'Electrician': /electrician|electrical|power/i,
+        'Spa': /spa|wellness|massage/i,
+        'Boutique': /boutique|fashion|clothing|apparel/i,
+        'Bakery': /bakery|bakehouse|sweets|cake/i,
+        'Hotel': /hotel|resort|lodging|inn/i,
+        'Car Service': /car|auto|repair|service|garage/i,
+        'Lawyer': /lawyer|attorney|law/i
+      };
+
+      if (categoryRegexMap[category]) {
+        query.category = { $regex: categoryRegexMap[category] };
+      } else {
+        query.category = { $regex: new RegExp(category.trim(), 'i') };
+      }
+    }
+
+    // 3. Filter: City (Location)
+    if (city) {
+      query.address = { $regex: new RegExp(city.trim(), 'i') };
+    }
+
+    // 4. Filter: Outreach Status
+    if (status) {
+      query.status = status;
+    }
+
+    // 9. Filter: Search Query Link (Particular search job filter)
+    if (searchQueryId) {
+      query.searchQueryId = searchQueryId;
+    }
+
+    // Establish statsQuery (filters applied to stats cards calculation)
+    const statsQuery = { ...query };
+
+    // Apply specific parameters to the main paginated query
+    // 5. Filter: Has Website
     if (hasWebsite) {
       if (hasWebsite === 'true') {
         query.website = { $exists: true, $nin: [null, '', 'null'] };
@@ -37,32 +89,53 @@ const getAllLeads = async (req, res, next) => {
       }
     }
 
-    // 3. Filter: Opportunity Level
+    // 6. Filter: Opportunity Level
     if (opportunityLevel) {
       query.opportunityLevel = opportunityLevel;
     }
 
-    // 4. Filter: Outreach Status
-    if (status) {
-      query.status = status;
-    }
-
-    // 5. Filter: Website Status
+    // 7. Filter: Website Status
     if (websiteStatus) {
       query.websiteStatus = websiteStatus;
     }
 
-    // 6. Filter: Category (Niche)
-    if (category) {
-      query.category = category;
+    // 8. Filter: Quick Filter matching stats card categories
+    if (quickFilter) {
+      if (quickFilter === 'hot') {
+        query.opportunityLevel = 'High';
+      } else if (quickFilter === 'warm') {
+        query.opportunityLevel = 'Medium';
+      } else if (quickFilter === 'cold') {
+        query.opportunityLevel = 'Low';
+      } else if (quickFilter === 'needWebsite') {
+        query.$or = [
+          { website: { $exists: false } },
+          { website: null },
+          { website: '' },
+          { website: 'null' },
+          { websiteStatus: 'No Website' }
+        ];
+      } else if (quickFilter === 'needReputation') {
+        query.$or = [
+          { rating: { $lt: 4.0 } },
+          { reviewCount: { $lt: 15 } }
+        ];
+      } else if (quickFilter === 'needSocial') {
+        query.$or = [
+          { website: { $exists: false } },
+          { website: null },
+          { website: '' },
+          { website: 'null' },
+          { websiteStatus: 'No Website' },
+          { opportunityLevel: 'High' }
+        ];
+      } else if (quickFilter === 'enriched') {
+        query.phone = { $exists: true, $ne: '' };
+        query.website = { $exists: true, $nin: [null, '', 'null'] };
+      }
     }
 
-    // 7. Filter: City (Location)
-    if (city) {
-      query.address = { $regex: new RegExp(city.trim(), 'i') };
-    }
-
-    // Project listing fields ONLY to optimize database memory and network payloads (Avoid loading unnecessary data)
+    // Project listing fields ONLY to optimize database memory and network payloads
     const projection = {
       businessName: 1,
       phone: 1,
@@ -78,7 +151,6 @@ const getAllLeads = async (req, res, next) => {
       opportunityLevel: 1,
       status: 1,
       createdAt: 1
-      // Excludes: screenshotFull, screenshotThumb, notes, and all AI pitches
     };
 
     const totalLeads = await Lead.countDocuments(query);
@@ -87,13 +159,62 @@ const getAllLeads = async (req, res, next) => {
       .skip(skip)
       .limit(limit);
 
+    // Compute stats counts database-wide for the current base query
+    const stats = {
+      hot: await Lead.countDocuments({ ...statsQuery, opportunityLevel: 'High' }),
+      warm: await Lead.countDocuments({ ...statsQuery, opportunityLevel: 'Medium' }),
+      cold: await Lead.countDocuments({ ...statsQuery, opportunityLevel: 'Low' }),
+      needWebsite: await Lead.countDocuments({
+        ...statsQuery,
+        $or: [
+          { website: { $exists: false } },
+          { website: null },
+          { website: '' },
+          { website: 'null' },
+          { websiteStatus: 'No Website' }
+        ]
+      }),
+      needReputation: await Lead.countDocuments({
+        ...statsQuery,
+        $or: [
+          { rating: { $lt: 4.0 } },
+          { reviewCount: { $lt: 15 } }
+        ]
+      }),
+      needSocial: await Lead.countDocuments({
+        ...statsQuery,
+        $or: [
+          { website: { $exists: false } },
+          { website: null },
+          { website: '' },
+          { website: 'null' },
+          { websiteStatus: 'No Website' },
+          { opportunityLevel: 'High' }
+        ]
+      }),
+      enriched: await Lead.countDocuments({
+        ...statsQuery,
+        phone: { $exists: true, $ne: '' },
+        website: { $exists: true, $nin: [null, '', 'null'] }
+      }),
+      statusCounts: {
+        new: await Lead.countDocuments({ ...statsQuery, status: 'New' }),
+        contacted: await Lead.countDocuments({ ...statsQuery, status: 'Contacted' }),
+        followUp: await Lead.countDocuments({ ...statsQuery, status: 'Follow Up' }),
+        interested: await Lead.countDocuments({ ...statsQuery, status: 'Interested' }),
+        closed: await Lead.countDocuments({ ...statsQuery, status: 'Closed' }),
+        rejected: await Lead.countDocuments({ ...statsQuery, status: 'Rejected' })
+      }
+    };
+
     res.status(200).json({
       success: true,
       page,
       limit,
       totalLeads,
       totalPages: Math.ceil(totalLeads / limit),
-      data: leads
+      data: leads,
+      stats
     });
   } catch (error) {
     next(error);

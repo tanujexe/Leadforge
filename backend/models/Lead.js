@@ -54,7 +54,7 @@ const LeadSchema = new mongoose.Schema({
     default: 'New' 
   },
   notes: [NoteSchema],
-  searchQueryId: { type: mongoose.Schema.Types.ObjectId, ref: 'SearchQuery', default: null },
+  searchQueryId: [{ type: mongoose.Schema.Types.ObjectId, ref: 'SearchQuery' }],
   isDeleted: { type: Boolean, default: false, index: true }
 }, {
   timestamps: true
