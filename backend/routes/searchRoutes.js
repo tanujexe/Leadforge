@@ -6,18 +6,20 @@ const {
   getRecentSearches
 } = require('../controllers/searchController');
 const { validate, searchSchema, idParamSchema } = require('../middleware/validate');
+const { requireAuth, checkPermission } = require('../middleware/auth');
 
 // Base path: /api/search
 
-// Validate search inputs on scan dispatcher
+// Validate search inputs on scan dispatcher and enforce scan authorization/permissions
 router.route('/')
-  .post(validate(searchSchema), createSearch);
+  .post(requireAuth, checkPermission('canScan'), validate(searchSchema), createSearch);
 
 router.route('/history')
-  .get(getRecentSearches);
+  .get(requireAuth, getRecentSearches);
 
 // Validate MongoDB ObjectId on status check polling
 router.route('/status/:id')
-  .get(validate(idParamSchema), getSearchQueryStatus);
+  .get(requireAuth, validate(idParamSchema), getSearchQueryStatus);
 
 module.exports = router;
+
