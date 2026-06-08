@@ -152,3 +152,74 @@ export function useAppConfig() {
     staleTime: Infinity
   });
 }
+
+export function useLogCall() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, callOutcome, details, followUpDate }) => 
+      leadService.logCall(id, callOutcome, details, followUpDate),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['leadActivity', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['managementAnalytics'] });
+      queryClient.invalidateQueries({ queryKey: ['managementProductivity'] });
+      queryClient.invalidateQueries({ queryKey: ['managementTimeline'] });
+      queryClient.invalidateQueries({ queryKey: ['managementSchedule'] });
+    }
+  });
+}
+
+export function useAssignLead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, userId }) => leadService.assignLead(id, userId),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['leadActivity', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['managementTimeline'] });
+    }
+  });
+}
+
+export function useLeadActivity(id) {
+  return useQuery({
+    queryKey: ['leadActivity', id],
+    queryFn: () => leadService.getActivity(id),
+    enabled: !!id
+  });
+}
+
+export function useUpdateActivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, logId, data }) => leadService.updateActivity(id, logId, data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['leadActivity', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['managementAnalytics'] });
+      queryClient.invalidateQueries({ queryKey: ['managementProductivity'] });
+      queryClient.invalidateQueries({ queryKey: ['managementTimeline'] });
+      queryClient.invalidateQueries({ queryKey: ['managementSchedule'] });
+    }
+  });
+}
+
+export function useDeleteActivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, logId }) => leadService.deleteActivity(id, logId),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['leadActivity', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['managementAnalytics'] });
+      queryClient.invalidateQueries({ queryKey: ['managementProductivity'] });
+      queryClient.invalidateQueries({ queryKey: ['managementTimeline'] });
+      queryClient.invalidateQueries({ queryKey: ['managementSchedule'] });
+    }
+  });
+}
+

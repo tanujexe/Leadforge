@@ -11,7 +11,17 @@ const {
   manuallyGenerateAI,
   bulkUpdateStatus,
   bulkAddNote,
-  bulkDeleteLeads
+  bulkDeleteLeads,
+  getTrashLeads,
+  restoreLead,
+  purgeLead,
+  bulkRestoreLeads,
+  bulkPurgeLeads,
+  getLeadActivity,
+  logCall,
+  assignLead,
+  updateActivityLog,
+  deleteActivityLog
 } = require('../controllers/leadController');
 const {
   validate,
@@ -22,30 +32,52 @@ const {
   bulkDeleteSchema,
   idParamSchema
 } = require('../middleware/validate');
+const { requireAuth, requireAdmin, checkPermission } = require('../middleware/auth');
 
 // Base path: /api/leads
 
-// 1. Directory queries
+// 1. Directory queries (Requires Auth)
 router.route('/')
-  .get(getAllLeads);
+  .get(requireAuth, getAllLeads);
 
-// 2. Bulk Actions (Zod validated)
-router.post('/bulk-status', validate(bulkStatusSchema), bulkUpdateStatus);
-router.post('/bulk-note', validate(bulkNoteSchema), bulkAddNote);
-router.post('/bulk-delete', validate(bulkDeleteSchema), bulkDeleteLeads);
+// 2. Trash Recovery Routes (Admin Only)
+router.route('/trash')
+  .get(requireAuth, requireAdmin, getTrashLeads);
 
-// 3. Lead Profile Operations (Zod parameter check)
+router.post('/trash/bulk-restore', requireAuth, requireAdmin, bulkRestoreLeads);
+router.post('/trash/bulk-purge', requireAuth, requireAdmin, bulkPurgeLeads);
+
+router.route('/trash/:id/restore')
+  .post(requireAuth, requireAdmin, validate(idParamSchema), restoreLead);
+
+router.route('/trash/:id/purge')
+  .delete(requireAuth, requireAdmin, validate(idParamSchema), purgeLead);
+
+// 3. Bulk Actions (Requires Auth and appropriate permissions)
+router.post('/bulk-status', requireAuth, checkPermission('canEditLeads'), validate(bulkStatusSchema), bulkUpdateStatus);
+router.post('/bulk-note', requireAuth, checkPermission('canEditLeads'), validate(bulkNoteSchema), bulkAddNote);
+router.post('/bulk-delete', requireAuth, checkPermission('canDeleteLeads'), validate(bulkDeleteSchema), bulkDeleteLeads);
+
+// 4. Lead Profile Operations (Requires Auth)
 router.route('/:id')
-  .get(validate(idParamSchema), getLeadById)
-  .delete(validate(idParamSchema), deleteLead);
+  .get(requireAuth, validate(idParamSchema), getLeadById)
+  .delete(requireAuth, checkPermission('canDeleteLeads'), validate(idParamSchema), deleteLead);
 
-// 4. Status update and Note timeline mutations (Zod body check)
-router.put('/:id/status', validate(statusUpdateSchema), updateLeadStatus);
-router.post('/:id/notes', validate(noteSchema), addLeadNote);
+// 5. Status update and Note timeline mutations (Requires canEditLeads permission)
+router.put('/:id/status', requireAuth, checkPermission('canEditLeads'), validate(statusUpdateSchema), updateLeadStatus);
+router.post('/:id/notes', requireAuth, checkPermission('canEditLeads'), validate(noteSchema), addLeadNote);
 
-// 5. Manual triggers (Zod param validation)
-router.post('/:id/audit', validate(idParamSchema), manuallyAuditLeadWebsite);
-router.post('/:id/generate-ai', validate(idParamSchema), manuallyGenerateAI);
-router.post('/:id/regenerate-ai', validate(idParamSchema), manuallyRegenerateAI);
+// 6. Manual triggers (Requires canScan permission)
+router.post('/:id/audit', requireAuth, checkPermission('canScan'), validate(idParamSchema), manuallyAuditLeadWebsite);
+router.post('/:id/generate-ai', requireAuth, checkPermission('canScan'), validate(idParamSchema), manuallyGenerateAI);
+router.post('/:id/regenerate-ai', requireAuth, checkPermission('canScan'), validate(idParamSchema), manuallyRegenerateAI);
+
+// 7. CRM & Activity Routes (Requires Auth)
+router.get('/:id/activity', requireAuth, validate(idParamSchema), getLeadActivity);
+router.post('/:id/call', requireAuth, checkPermission('canEditLeads'), validate(idParamSchema), logCall);
+router.post('/:id/assign', requireAuth, checkPermission('canEditLeads'), validate(idParamSchema), assignLead);
+router.put('/:id/activity/:logId', requireAuth, checkPermission('canEditLeads'), validate(idParamSchema), updateActivityLog);
+router.delete('/:id/activity/:logId', requireAuth, checkPermission('canEditLeads'), validate(idParamSchema), deleteActivityLog);
 
 module.exports = router;
+
