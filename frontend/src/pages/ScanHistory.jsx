@@ -1,11 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLeads, useSearchHistory } from '../hooks/useLeads';
-import { ChevronRight, History, Cpu, Users, Search } from 'lucide-react';
+import { ChevronRight, History, Cpu, Users, Search, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function ScanHistory({ setActiveTab, setSelectedSearchQueryId }) {
   const { data: historyResponse, isLoading, error } = useSearchHistory();
   const { data: leadsResponse } = useLeads({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  // Reset visible count when search term changes
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [searchTerm]);
 
   const searches = historyResponse?.data || [];
 
@@ -130,7 +136,7 @@ export default function ScanHistory({ setActiveTab, setSelectedSearchQueryId }) 
                   </td>
                 </tr>
               ) : (
-                filteredSearches.map((search) => {
+                filteredSearches.slice(0, visibleCount).map((search) => {
                   let badgeColor = 'bg-primary/10 text-primary border-primary/20';
                   if (search.status === 'Completed') badgeColor = 'bg-success/10 text-success border-success/20';
                   if (search.status === 'Failed') badgeColor = 'bg-danger/10 text-danger border-danger/20';
@@ -173,6 +179,30 @@ export default function ScanHistory({ setActiveTab, setSelectedSearchQueryId }) 
             </tbody>
           </table>
         </div>
+
+        {/* Show More / Show Less Pagination Buttons */}
+        {filteredSearches.length > 10 && (
+          <div className="flex justify-center gap-3 pt-4 border-t border-border/40">
+            {visibleCount > 10 && (
+              <button
+                onClick={() => setVisibleCount(10)}
+                className="px-4 py-2 bg-[#18181B] hover:bg-elevated/60 border border-border text-text font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <span>Show Less</span>
+                <ChevronUp size={12} className="text-text-secondary" />
+              </button>
+            )}
+            {filteredSearches.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount(prev => prev + 10)}
+                className="px-4 py-2 bg-[#18181B] hover:bg-elevated/60 border border-border text-text font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <span>Show More</span>
+                <ChevronDown size={12} className="text-text-secondary" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

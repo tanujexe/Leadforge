@@ -7,7 +7,7 @@ const path = require('path');
  * @param {string} location - E.g. "Bhopal" or "Gwalior"
  * @returns {Array<Object>} Mock business details
  */
-function generateDemoLeads(businessType, location) {
+function generateDemoLeads(businessType, location, limit = 30) {
   const normalizedType = businessType.toLowerCase().trim();
   const correctedType = normalizedType.includes('gym') ? 'Gym' 
                       : normalizedType.includes('cafe') ? 'Cafe' 
@@ -15,7 +15,7 @@ function generateDemoLeads(businessType, location) {
                       : normalizedType.includes('sal') ? 'Salon' 
                       : 'Business';
 
-  const count = Math.floor(Math.random() * 16) + 20; // 20 to 35 leads
+  const count = limit;
   const leads = [];
 
   const adjectives = [
