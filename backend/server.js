@@ -44,8 +44,18 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // 4. Secure CORS Configuration
+const allowedOrigins = ['http://localhost:5173', 'https://clientscout-snowy.vercel.app'];
+if (process.env.CLIENT_ORIGIN) {
+  const envOrigins = process.env.CLIENT_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, ''));
+  envOrigins.forEach(origin => {
+    if (origin && !allowedOrigins.includes(origin)) {
+      allowedOrigins.push(origin);
+    }
+  });
+}
+
 app.use(cors({
-  origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true,
   optionsSuccessStatus: 200
 }));
