@@ -32,6 +32,20 @@ function validateEnv() {
     );
   }
 
+  // Validate Firebase Admin variables
+  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !process.env.FIREBASE_PRIVATE_KEY) {
+    warnings.push(
+      'Firebase Admin credentials (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are not fully configured. User authentication will be disabled.'
+    );
+  }
+
+  // Validate JWT Secret
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.trim() === '') {
+    warnings.push(
+      'JWT_SECRET is missing. Session JWT signing will use a default fallback key (Insecure for production).'
+    );
+  }
+
   if (errors.length > 0) {
     console.error('\n❌ CRITICAL CONFIGURATION ERRORS DETECTED:');
     errors.forEach(err => console.error(` - ${err}`));

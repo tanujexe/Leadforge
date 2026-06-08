@@ -1,7 +1,57 @@
 const Lead = require('../models/Lead');
+const ActivityLog = require('../models/ActivityLog');
+const User = require('../models/User');
 const { auditWebsite } = require('../services/audit/auditService');
 const { analyzeLeadAndGeneratePitches } = require('../services/groq/groqService');
 const { calculateLeadScore } = require('../utils/leadScorer');
+
+// Helper to log user activities permanently
+const logActivity = async (leadId, userId, actionType, details, callOutcome = null, followUpDate = null, noteId = null) => {
+  try {
+    const newLog = new ActivityLog({
+      leadId,
+      userId,
+      actionType,
+      details,
+      callOutcome,
+      followUpDate,
+      noteId
+    });
+    await newLog.save();
+  } catch (err) {
+    console.error('❌ Failed to save ActivityLog record:', err.message);
+  }
+};
+
+// Helper to enforce lead record ownership
+const checkLeadEditPermission = async (lead, user) => {
+  if (!user) {
+    const error = new Error('Authentication required.');
+    error.statusCode = 401;
+    throw error;
+  }
+  
+  if (!lead.owner) {
+    // Lazy assign the first modifier as the owner
+    lead.owner = user._id;
+    if (!lead.assignedTo) {
+      lead.assignedTo = user._id;
+    }
+    await lead.save();
+    
+    // Log the initial ownership claim
+    await logActivity(
+      lead._id,
+      user._id,
+      'Assign',
+      `Ownership claimed and assigned to ${user.name} during first edit.`
+    );
+  } else if (lead.owner.toString() !== user._id.toString() && user.role !== 'Admin') {
+    const error = new Error('You do not own this lead record and cannot modify it.');
+    error.statusCode = 403;
+    throw error;
+  }
+};
 
 /**
  * Get all leads with server-side pagination, sorting, and filters
@@ -150,14 +200,20 @@ const getAllLeads = async (req, res, next) => {
       leadScore: 1,
       opportunityLevel: 1,
       status: 1,
-      createdAt: 1
+      createdAt: 1,
+      owner: 1,
+      assignedTo: 1,
+      followUpDate: 1,
+      totalCalls: 1
     };
 
     const totalLeads = await Lead.countDocuments(query);
     const leads = await Lead.find(query, projection)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .populate('owner', 'name email picture')
+      .populate('assignedTo', 'name email picture');
 
     // Compute stats counts database-wide for the current base query
     const stats = {
@@ -226,7 +282,9 @@ const getAllLeads = async (req, res, next) => {
  */
 const getLeadById = async (req, res, next) => {
   try {
-    const lead = await Lead.findById(req.params.id);
+    const lead = await Lead.findById(req.params.id)
+      .populate('owner', 'name email picture role')
+      .populate('assignedTo', 'name email picture role');
     if (!lead) {
       res.status(404);
       throw new Error('Lead not found');
@@ -257,14 +315,25 @@ const updateLeadStatus = async (req, res, next) => {
       throw new Error('Lead not found');
     }
 
+    const oldStatus = lead.status;
+    await checkLeadEditPermission(lead, req.user);
     lead.status = status;
     await lead.save();
+
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'StatusChange',
+      `Status updated from ${oldStatus} to ${status}.`
+    );
 
     res.status(200).json({
       success: true,
       data: lead
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };
@@ -286,14 +355,29 @@ const addLeadNote = async (req, res, next) => {
       throw new Error('Lead not found');
     }
 
-    lead.notes.unshift({ content });
+    await checkLeadEditPermission(lead, req.user);
+    lead.notes.unshift({ content: content.trim() });
     await lead.save();
+
+    const newNote = lead.notes[0];
+
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'AddNote',
+      `Note logged: "${content.trim().slice(0, 60)}${content.trim().length > 60 ? '...' : ''}"`,
+      null,
+      null,
+      newNote._id
+    );
 
     res.status(200).json({
       success: true,
       data: lead
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };
@@ -303,17 +387,30 @@ const addLeadNote = async (req, res, next) => {
  */
 const deleteLead = async (req, res, next) => {
   try {
-    const lead = await Lead.findByIdAndUpdate(req.params.id, { isDeleted: true }, { new: true });
+    const lead = await Lead.findById(req.params.id);
     if (!lead) {
       res.status(404);
       throw new Error('Lead not found');
     }
+
+    await checkLeadEditPermission(lead, req.user);
+    lead.isDeleted = true;
+    await lead.save();
+
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'StatusChange',
+      'Lead moved to Trash Recovery.'
+    );
     
     res.status(200).json({
       success: true,
       message: 'Lead deleted successfully'
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };
@@ -328,6 +425,8 @@ const manuallyAuditLeadWebsite = async (req, res, next) => {
       res.status(404);
       throw new Error('Lead not found');
     }
+
+    await checkLeadEditPermission(lead, req.user);
 
     if (!lead.website) {
       res.status(400);
@@ -365,12 +464,21 @@ const manuallyAuditLeadWebsite = async (req, res, next) => {
 
     await lead.save();
 
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'Audited',
+      `Manual website audit executed (Cache bypassed: ${force ? 'Yes' : 'No'}).`
+    );
+
     res.status(200).json({
       success: true,
       message: 'Website audit refreshed successfully.',
       data: lead
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };
@@ -385,6 +493,8 @@ const manuallyGenerateAI = async (req, res, next) => {
       res.status(404);
       throw new Error('Lead not found');
     }
+
+    await checkLeadEditPermission(lead, req.user);
 
     // Reuse existing AI cache if present
     if (lead.aiSummary && lead.aiSummary.trim() !== '') {
@@ -408,12 +518,21 @@ const manuallyGenerateAI = async (req, res, next) => {
 
     await lead.save();
 
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'AIRegenerated',
+      'Outreach proposals generated using Groq AI.'
+    );
+
     res.status(200).json({
       success: true,
       message: 'AI pitches generated successfully.',
       data: lead
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };
@@ -429,6 +548,8 @@ const manuallyRegenerateAI = async (req, res, next) => {
       throw new Error('Lead not found');
     }
 
+    await checkLeadEditPermission(lead, req.user);
+
     console.log(`[Manual AI] Force regenerating pitches and summary via Groq for: "${lead.businessName}"`);
     const aiResults = await analyzeLeadAndGeneratePitches(lead);
 
@@ -441,12 +562,21 @@ const manuallyRegenerateAI = async (req, res, next) => {
 
     await lead.save();
 
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'AIRegenerated',
+      'Outreach proposals regenerated and refreshed using Groq AI.'
+    );
+
     res.status(200).json({
       success: true,
       message: 'AI pitches regenerated successfully.',
       data: lead
     });
   } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
     next(error);
   }
 };
@@ -534,6 +664,428 @@ const bulkDeleteLeads = async (req, res, next) => {
   }
 };
 
+/**
+ * Get all soft-deleted leads (Trash) - Admin only
+ */
+const getTrashLeads = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 50;
+    const skip = (page - 1) * limit;
+
+    const query = { isDeleted: true };
+    const totalLeads = await Lead.countDocuments(query);
+    const leads = await Lead.find(query)
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.status(200).json({
+      success: true,
+      page,
+      limit,
+      totalLeads,
+      totalPages: Math.ceil(totalLeads / limit),
+      data: leads
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Restore a soft-deleted lead - Admin only
+ */
+const restoreLead = async (req, res, next) => {
+  try {
+    const lead = await Lead.findByIdAndUpdate(
+      req.params.id,
+      { $set: { isDeleted: false } },
+      { new: true }
+    );
+
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found or not in trash');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Lead restored successfully',
+      data: lead
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Permanently delete (purge) a lead from MongoDB - Admin only
+ */
+const purgeLead = async (req, res, next) => {
+  try {
+    const lead = await Lead.findByIdAndDelete(req.params.id);
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Lead permanently purged from database'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Bulk restore soft-deleted leads - Admin only
+ */
+const bulkRestoreLeads = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      res.status(400);
+      throw new Error('Please provide an array of lead IDs to restore');
+    }
+
+    const result = await Lead.updateMany(
+      { _id: { $in: ids }, isDeleted: true },
+      { $set: { isDeleted: false } }
+    );
+
+    res.status(200).json({
+      success: true,
+      restoredCount: result.modifiedCount
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Bulk permanently delete (purge) leads - Admin only
+ */
+const bulkPurgeLeads = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids)) {
+      res.status(400);
+      throw new Error('Please provide an array of lead IDs to purge');
+    }
+
+    const result = await Lead.deleteMany({ _id: { $in: ids } });
+
+    res.status(200).json({
+      success: true,
+      purgedCount: result.deletedCount
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get chronological activity history logs for a lead
+ */
+const getLeadActivity = async (req, res, next) => {
+  try {
+    const logs = await ActivityLog.find({ leadId: req.params.id })
+      .sort({ timestamp: -1 })
+      .populate('userId', 'name email picture role');
+      
+    res.status(200).json({
+      success: true,
+      data: logs
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Log outreach call outcome and schedule optional follow-up
+ */
+const logCall = async (req, res, next) => {
+  try {
+    const { callOutcome, details, followUpDate } = req.body;
+    if (!callOutcome) {
+      res.status(400);
+      throw new Error('Please provide a call outcome.');
+    }
+
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found.');
+    }
+
+    await checkLeadEditPermission(lead, req.user);
+
+    // Increment call counter
+    lead.totalCalls = (lead.totalCalls || 0) + 1;
+    
+    // Set follow-up date if scheduled
+    if (followUpDate) {
+      lead.followUpDate = new Date(followUpDate);
+      lead.status = 'Follow Up'; // Transition pipeline status automatically
+    } else {
+      // Transition to Contacted status if not already follow-up/interested/closed
+      if (['New'].includes(lead.status)) {
+        lead.status = 'Contacted';
+      }
+    }
+    
+    await lead.save();
+
+    // Log to permanent Activity logs
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'CallLog',
+      details || `Call placed. Outcome: ${callOutcome}`,
+      callOutcome,
+      followUpDate ? new Date(followUpDate) : null
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Call logged successfully.',
+      data: lead
+    });
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+/**
+ * Assign lead handling to a team member
+ */
+const assignLead = async (req, res, next) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      res.status(400);
+      throw new Error('Please provide a user ID to assign.');
+    }
+
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found.');
+    }
+
+    // Only owner or admin can assign leads
+    await checkLeadEditPermission(lead, req.user);
+
+    const assignee = await User.findById(userId);
+    if (!assignee) {
+      res.status(404);
+      throw new Error('Assignee user not found.');
+    }
+
+    const oldAssignee = lead.assignedTo ? await User.findById(lead.assignedTo) : null;
+    lead.assignedTo = assignee._id;
+    await lead.save();
+
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'Assign',
+      `Lead assigned to ${assignee.name}${oldAssignee ? ` (previously assigned to ${oldAssignee.name})` : ''}.`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Lead assigned to ${assignee.name} successfully.`,
+      data: lead
+    });
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+/**
+ * Update a manual activity log entry (Note or CallLog)
+ */
+const updateActivityLog = async (req, res, next) => {
+  try {
+    const { id, logId } = req.params;
+    const { details, callOutcome, followUpDate } = req.body;
+
+    const log = await ActivityLog.findById(logId);
+    if (!log) {
+      res.status(404);
+      throw new Error('Activity log entry not found.');
+    }
+
+    if (log.leadId.toString() !== id) {
+      res.status(400);
+      throw new Error('Log entry does not belong to this lead.');
+    }
+
+    if (log.userId.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+      res.status(403);
+      throw new Error('You do not have permission to modify this log entry.');
+    }
+
+    if (!['AddNote', 'CallLog'].includes(log.actionType)) {
+      res.status(400);
+      throw new Error('Only manual notes and call logs can be edited.');
+    }
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found.');
+    }
+
+    if (log.actionType === 'AddNote') {
+      if (log.noteId) {
+        const noteSubdoc = lead.notes.id(log.noteId);
+        if (noteSubdoc && details) {
+          noteSubdoc.content = details;
+          await lead.save();
+        }
+      } else {
+        const oldNoteText = log.details.replace(/^Note logged: "/, '').replace(/"$/, '').replace(/^Note added by .*?: "/, '').replace(/"$/, '');
+        const noteSubdoc = lead.notes.find(n => n.content.substring(0, 60) === oldNoteText.substring(0, 60));
+        if (noteSubdoc && details) {
+          noteSubdoc.content = details;
+          await lead.save();
+        }
+      }
+      
+      log.details = `Note logged: "${details}"`;
+    } else if (log.actionType === 'CallLog') {
+      if (details) log.details = details;
+      if (callOutcome) log.callOutcome = callOutcome;
+      
+      if (followUpDate !== undefined) {
+        log.followUpDate = followUpDate ? new Date(followUpDate) : null;
+        
+        if (followUpDate) {
+          lead.followUpDate = new Date(followUpDate);
+          lead.status = 'Follow Up';
+        } else {
+          const now = new Date();
+          const remainingFollowups = await ActivityLog.find({
+            leadId: lead._id,
+            _id: { $ne: log._id },
+            actionType: 'CallLog',
+            followUpDate: { $ne: null, $gte: now }
+          }).sort({ followUpDate: 1 });
+          
+          if (remainingFollowups.length > 0) {
+            lead.followUpDate = remainingFollowups[0].followUpDate;
+          } else {
+            lead.followUpDate = null;
+            if (lead.status === 'Follow Up') {
+              lead.status = 'Contacted';
+            }
+          }
+        }
+        await lead.save();
+      }
+    }
+
+    await log.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Activity log updated successfully.',
+      data: log
+    });
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+/**
+ * Delete a manual activity log entry
+ */
+const deleteActivityLog = async (req, res, next) => {
+  try {
+    const { id, logId } = req.params;
+
+    const log = await ActivityLog.findById(logId);
+    if (!log) {
+      res.status(404);
+      throw new Error('Activity log entry not found.');
+    }
+
+    if (log.leadId.toString() !== id) {
+      res.status(400);
+      throw new Error('Log entry does not belong to this lead.');
+    }
+
+    if (log.userId.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
+      res.status(403);
+      throw new Error('You do not have permission to delete this log entry.');
+    }
+
+    if (!['AddNote', 'CallLog'].includes(log.actionType)) {
+      res.status(400);
+      throw new Error('Only manual notes and call logs can be deleted.');
+    }
+
+    const lead = await Lead.findById(id);
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found.');
+    }
+
+    if (log.actionType === 'AddNote') {
+      if (log.noteId) {
+        lead.notes.pull(log.noteId);
+        await lead.save();
+      } else {
+        const oldNoteText = log.details.replace(/^Note logged: "/, '').replace(/"$/, '').replace(/^Note added by .*?: "/, '').replace(/"$/, '');
+        const noteIndex = lead.notes.findIndex(n => n.content.substring(0, 60) === oldNoteText.substring(0, 60));
+        if (noteIndex > -1) {
+          lead.notes.splice(noteIndex, 1);
+          await lead.save();
+        }
+      }
+    } else if (log.actionType === 'CallLog') {
+      lead.totalCalls = Math.max(0, (lead.totalCalls || 1) - 1);
+
+      const now = new Date();
+      const remainingFollowups = await ActivityLog.find({
+        leadId: lead._id,
+        _id: { $ne: log._id },
+        actionType: 'CallLog',
+        followUpDate: { $ne: null, $gte: now }
+      }).sort({ followUpDate: 1 });
+
+      if (remainingFollowups.length > 0) {
+        lead.followUpDate = remainingFollowups[0].followUpDate;
+      } else {
+        lead.followUpDate = null;
+        if (lead.status === 'Follow Up') {
+          lead.status = 'Contacted';
+        }
+      }
+      await lead.save();
+    }
+
+    await ActivityLog.findByIdAndDelete(logId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Activity log deleted successfully.'
+    });
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
 module.exports = {
   getAllLeads,
   getLeadById,
@@ -545,5 +1097,16 @@ module.exports = {
   manuallyGenerateAI,
   bulkUpdateStatus,
   bulkAddNote,
-  bulkDeleteLeads
+  bulkDeleteLeads,
+  getTrashLeads,
+  restoreLead,
+  purgeLead,
+  bulkRestoreLeads,
+  bulkPurgeLeads,
+  getLeadActivity,
+  logCall,
+  assignLead,
+  updateActivityLog,
+  deleteActivityLog
 };
+
