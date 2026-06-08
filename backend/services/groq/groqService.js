@@ -134,6 +134,35 @@ Best regards,
 }
 
 /**
+ * Formats AI field values (which might be returned as JSON objects/arrays by LLM) to strings.
+ */
+function formatAiFieldToString(value) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (typeof item === 'object') {
+        return `- ${JSON.stringify(item)}`;
+      }
+      return `- ${item}`;
+    }).join('\n');
+  }
+  if (typeof value === 'object') {
+    if (value.Subject || value.subject || value.Body || value.body) {
+      const subject = value.Subject || value.subject || '';
+      const body = value.Body || value.body || '';
+      return `Subject: ${subject}\n\n${body}`;
+    }
+    return JSON.stringify(value, null, 2);
+  }
+  return String(value);
+}
+
+/**
  * Analyzes lead metrics and website audit to generate custom pitches using Groq API
  */
 async function analyzeLeadAndGeneratePitches(lead) {
@@ -189,7 +218,7 @@ CRITICAL: Return ONLY valid, clean, parseable JSON. No conversational wrapper, n
         { role: 'system', content: 'You are a professional business analyst. Output valid JSON only.' },
         { role: 'user', content: prompt }
       ],
-      model: 'llama3-8b-8192',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.2,
       response_format: { type: 'json_object' }
     });
@@ -199,12 +228,12 @@ CRITICAL: Return ONLY valid, clean, parseable JSON. No conversational wrapper, n
 
     // Validate structure
     return {
-      aiSummary: parsedData.aiSummary || '',
-      aiReason: parsedData.aiReason || '',
-      callPitch: parsedData.callPitch || '',
-      whatsappPitch: parsedData.whatsappPitch || '',
-      emailPitch: parsedData.emailPitch || '',
-      meetingPitch: parsedData.meetingPitch || ''
+      aiSummary: formatAiFieldToString(parsedData.aiSummary),
+      aiReason: formatAiFieldToString(parsedData.aiReason),
+      callPitch: formatAiFieldToString(parsedData.callPitch),
+      whatsappPitch: formatAiFieldToString(parsedData.whatsappPitch),
+      emailPitch: formatAiFieldToString(parsedData.emailPitch),
+      meetingPitch: formatAiFieldToString(parsedData.meetingPitch)
     };
   } catch (error) {
     console.error('Groq API Error, falling back to templates:', error.message);
