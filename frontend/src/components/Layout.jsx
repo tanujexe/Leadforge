@@ -97,28 +97,23 @@ export default function Layout({ activeTab, setActiveTab, children }) {
           </nav>
         </div>
 
-        {/* Footer Connections Info */}
-        <div className="p-4 border-t border-border bg-[#111113]/30 text-[10px] text-text-muted space-y-1.5 font-mono">
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-            <span>API Server: 5000</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-            <span>MongoDB: Connected</span>
-          </div>
-          {config?.developmentMode && (
-            <div className="flex items-center gap-2 border-t border-border/40 pt-1.5 mt-1.5 text-warning font-bold uppercase tracking-wider text-[9px]">
-              <span>Development Mode Active</span>
+        {/* Footer Account Profile Info */}
+        <div className="p-4 border-t border-border bg-[#111113]/10 flex flex-col gap-2">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-extrabold text-xs font-brand">
+              CS
             </div>
-          )}
-          <div className="flex items-center gap-2 text-[9px] text-text-secondary/70">
-            <span className={`w-1.5 h-1.5 rounded-full ${config?.groqEnabled ? 'bg-success' : 'bg-danger/60'}`}></span>
-            <span>Groq: {config?.groqEnabled ? 'Enabled' : 'Disabled'}</span>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs font-bold text-text truncate font-brand leading-none">Scout Account</h4>
+              <span className="text-[9px] text-text-muted font-bold uppercase tracking-wider mt-0.5 inline-block">Pro Access</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-[9px] text-text-secondary/70">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-            <span>Apify: Protected</span>
+          <div className="flex justify-between items-center text-[9px] text-text-muted font-mono pt-1 border-t border-border/10">
+            <span>Version 1.0.0</span>
+            <span className="flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+              <span>Online</span>
+            </span>
           </div>
         </div>
       </aside>
@@ -164,23 +159,23 @@ export default function Layout({ activeTab, setActiveTab, children }) {
               </nav>
             </div>
             
-            <div className="p-4 border-t border-border bg-[#111113]/30 text-[10px] text-text-muted space-y-1.5 font-mono">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-                <span>API Server: Active</span>
-              </div>
-              {config?.developmentMode && (
-                <div className="text-warning font-bold text-[9px] uppercase tracking-wider">
-                  Development Mode Active
+            {/* Footer Account Profile Info */}
+            <div className="p-4 border-t border-border bg-[#111113]/10 flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-extrabold text-xs">
+                  CS
                 </div>
-              )}
-              <div className="flex items-center gap-2 text-[9px]">
-                <span className={`w-1.5 h-1.5 rounded-full ${config?.groqEnabled ? 'bg-success' : 'bg-danger/60'}`}></span>
-                <span>Groq: {config?.groqEnabled ? 'Enabled' : 'Disabled'}</span>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-bold text-text truncate leading-none">Scout Account</h4>
+                  <span className="text-[9px] text-text-muted font-bold uppercase tracking-wider mt-0.5 inline-block">Pro Access</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-[9px]">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                <span>Apify: Protected</span>
+              <div className="flex justify-between items-center text-[9px] text-text-muted font-mono pt-1 border-t border-border/10">
+                <span>Version 1.0.0</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+                  <span>Online</span>
+                </span>
               </div>
             </div>
           </aside>

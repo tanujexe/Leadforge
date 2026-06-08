@@ -469,7 +469,7 @@ export default function LeadSearch() {
       {leadsList.length > 0 && (
         <div className="space-y-4">
           {/* Quick Stats Toggles for Live Stream */}
-          <div className="flex md:grid md:grid-cols-7 gap-1.5 md:gap-3 mb-2 select-none">
+          <div className="flex overflow-x-auto scrollbar-none md:grid md:grid-cols-7 gap-2 md:gap-3 mb-2 select-none pb-2 md:pb-0">
             {[
               { id: 'hot', label: 'Hot', icon: Flame, count: counts.hot, color: 'hover:border-success/30 text-success bg-success/5 border-success/20', activeColor: 'border-success text-success bg-success/10 shadow-[0_0_12px_rgba(34,197,94,0.15)]' },
               { id: 'warm', label: 'Warm', icon: Zap, count: counts.warm, color: 'hover:border-warning/30 text-warning bg-warning/5 border-warning/20', activeColor: 'border-warning text-warning bg-warning/10 shadow-[0_0_12px_rgba(245,158,11,0.15)]' },
@@ -486,7 +486,7 @@ export default function LeadSearch() {
                   key={item.id}
                   type="button"
                   onClick={() => setQuickFilter(isActive ? null : item.id)}
-                  className={`flex-1 min-w-0 flex flex-col items-center justify-center p-1.5 md:p-3 rounded-lg md:rounded-xl border text-center transition-all duration-300 cursor-pointer h-12 md:h-20 ${
+                  className={`flex-shrink-0 min-w-[95px] md:min-w-0 flex-1 flex flex-col items-center justify-center p-1.5 md:p-3 rounded-lg md:rounded-xl border text-center transition-all duration-300 cursor-pointer h-12 md:h-20 ${
                     isActive ? item.activeColor : `bg-[#18181B] border-border/50 hover:bg-elevated/10 ${item.color}`
                   }`}
                 >

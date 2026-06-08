@@ -179,7 +179,8 @@ export default function Dashboard({ setActiveTab, setSelectedSearchQueryId }) {
           <p className="text-[10px] text-text-muted mt-0.5 font-medium">History log of maps crawls run on local host</p>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-border text-text-muted uppercase font-bold tracking-wider text-[10px]">
@@ -249,6 +250,72 @@ export default function Dashboard({ setActiveTab, setSelectedSearchQueryId }) {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View */}
+        <div className="block md:hidden space-y-3">
+          {historyLoading ? (
+            <div className="py-8 text-center text-text-muted/60 font-mono">
+              <span className="inline-block w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin mr-2"></span>
+              Querying logs...
+            </div>
+          ) : searches.length === 0 ? (
+            <div className="py-8 text-center text-text-muted/60">
+              No lead scans run yet. Run a search to collect real leads.
+            </div>
+          ) : (
+            searches.slice(0, 5).map((search) => {
+              let badgeColor = 'bg-primary/10 text-primary border-primary/20';
+              if (search.status === 'Completed') badgeColor = 'bg-success/10 text-success border-success/20';
+              if (search.status === 'Failed') badgeColor = 'bg-danger/10 text-danger border-danger/20';
+              if (search.status === 'Scraping' || search.status === 'Auditing' || search.status === 'Analyzing') {
+                badgeColor = 'bg-warning/10 text-warning border-warning/20 animate-pulse';
+              }
+
+              return (
+                <div key={search._id} className="bg-[#18181B] border border-border/60 rounded-xl p-4 space-y-3 hover:border-primary/40 transition-all">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-text capitalize text-xs">{search.businessType}</h4>
+                      <p className="text-[10px] text-text-muted mt-0.5 capitalize">{search.location}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded border text-[9px] font-bold uppercase tracking-wider ${badgeColor}`}>
+                      {search.status}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 border-t border-border/20 pt-2.5 text-[10px] text-text-secondary font-mono">
+                    <div>
+                      <span className="text-[9px] text-text-muted block uppercase tracking-wider font-sans font-bold">Leads</span>
+                      <span className="font-bold text-text">{search.leadCount} / {search.limit || 30}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-text-muted block uppercase tracking-wider font-sans font-bold">Credits</span>
+                      <span>{formatCredits(search.creditsUsed)}</span>
+                    </div>
+                    <div>
+                      <span className="text-[9px] text-text-muted block uppercase tracking-wider font-sans font-bold">Duration</span>
+                      <span className="truncate">{formatDuration(search.durationMs)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
+                    <span className="text-[9px] font-mono text-text-muted">{new Date(search.createdAt).toLocaleString()}</span>
+                    <button 
+                      onClick={() => {
+                        setSelectedSearchQueryId(search._id);
+                        setActiveTab('database');
+                      }}
+                      className="text-primary hover:text-primary-hover font-bold flex items-center gap-0.5 text-[11px] cursor-pointer"
+                    >
+                      <span>Open List</span>
+                      <ChevronRight size={10} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
