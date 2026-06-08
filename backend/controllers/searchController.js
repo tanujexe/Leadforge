@@ -10,7 +10,7 @@ const { correctBusinessType } = require('../utils/typoCorrector');
 /**
  * Background worker task executing Google Maps searches, auditing, and AI synthesis
  */
-async function runSearchWorker(searchId, businessType, location, limit = 30) {
+async function runSearchWorker(searchId, businessType, location, limit = 30, userId = null) {
   const startTime = Date.now();
   try {
     // Check for duplicate search queries in the last 7 days (Case-Insensitive)
@@ -165,7 +165,9 @@ async function runSearchWorker(searchId, businessType, location, limit = 30) {
           screenshotThumb: auditResult.screenshotThumb || null,
           status: 'New',
           audit: auditResult,
-          lastAuditAt: biz.website ? new Date() : null
+          lastAuditAt: biz.website ? new Date() : null,
+          owner: userId || null,
+          assignedTo: userId || null
         });
 
         // Calculate opportunity scores deterministically on backend
@@ -221,6 +223,21 @@ const createSearch = async (req, res, next) => {
       throw new Error('Please provide both businessType and location');
     }
 
+    // Verify daily scan limit for non-Admin users
+    if (req.user && req.user.role !== 'Admin') {
+      if (req.user.dailyScansUsed >= req.user.dailyScanLimit) {
+        return res.status(403).json({
+          success: false,
+          error: 'DailyLimitExceeded',
+          message: `Daily scan limit reached. You have used all of your allocated ${req.user.dailyScanLimit} scans for today. Please contact your administrator to request a higher limit.`
+        });
+      }
+      
+      // Increment the scans used
+      req.user.dailyScansUsed += 1;
+      await req.user.save();
+    }
+
     // Auto-correct common spelling mistakes (e.g., gum -> gym, caffe -> cafe)
     const businessType = correctBusinessType(rawBusinessType);
 
@@ -254,11 +271,12 @@ const createSearch = async (req, res, next) => {
       businessType: businessType.trim(),
       location: location.trim(),
       status: 'Pending',
-      limit: limit || 30
+      limit: limit || 30,
+      userId: req.user ? req.user._id : null
     });
 
     // Run background worker asynchronously
-    runSearchWorker(searchQuery._id, businessType.trim(), location.trim(), limit);
+    runSearchWorker(searchQuery._id, businessType.trim(), location.trim(), limit, req.user ? req.user._id : null);
 
     res.status(202).json({
       success: true,

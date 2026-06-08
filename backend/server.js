@@ -69,9 +69,11 @@ const path = require('path');
 app.use('/screenshots', express.static(path.join(__dirname, 'public/screenshots')));
 
 // Define API Routes
+app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/leads', require('./routes/leadRoutes'));
 app.use('/api/search', require('./routes/searchRoutes'));
 app.use('/api/export', require('./routes/exportRoutes'));
+app.use('/api/management', require('./routes/managementRoutes'));
 
 // Server status environment configurations
 app.get('/api/config', (req, res) => {
