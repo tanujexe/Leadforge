@@ -132,7 +132,10 @@ function CustomFilterSelect({ value, onChange, options, disabled, widthClass = "
   );
 }
 
-export default function LeadManagement({ selectedSearchQueryId, setSelectedSearchQueryId }) {
+export default function LeadManagement({ selectedSearchQueryId, setSelectedSearchQueryId, user }) {
+  const canDelete = user?.role === 'Admin' || user?.permissions?.canDeleteLeads;
+  const canEdit = user?.role === 'Admin' || user?.permissions?.canEditLeads;
+  const canExport = user?.role === 'Admin' || user?.permissions?.canExport;
   const [search, setSearch] = useState('');
   const [hasWebsite, setHasWebsite] = useState('');
   const [opportunityLevel, setOpportunityLevel] = useState('');
@@ -267,29 +270,60 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
     }
   };
 
-  const getExcelExportLink = () => {
-    const baseUrl = import.meta.env.VITE_API_URL || '';
-    let path = '/api/export/excel';
-    
-    if (selectedIds.length > 0) {
-      path += `?ids=${selectedIds.join(',')}`;
-    } else {
-      const params = new URLSearchParams();
-      if (search.trim()) params.append('search', search.trim());
-      if (hasWebsite) params.append('hasWebsite', hasWebsite);
-      if (opportunityLevel) params.append('opportunityLevel', opportunityLevel);
-      if (websiteStatus) params.append('websiteStatus', websiteStatus);
-      if (status) params.append('status', status);
-      if (category) params.append('category', category);
-      if (city) params.append('city', city);
+  const handleExportExcel = async () => {
+    if (!canExport) return;
+    try {
+      const token = localStorage.getItem('token');
+      let path = '/export/excel';
       
-      const queryString = params.toString();
-      if (queryString) {
-        path += `?${queryString}`;
+      if (selectedIds.length > 0) {
+        path += `?ids=${selectedIds.join(',')}`;
+      } else {
+        const queryParams = [];
+        if (search.trim()) queryParams.push(`search=${encodeURIComponent(search.trim())}`);
+        if (hasWebsite) queryParams.push(`hasWebsite=${hasWebsite}`);
+        if (opportunityLevel) queryParams.push(`opportunityLevel=${opportunityLevel}`);
+        if (websiteStatus) queryParams.push(`websiteStatus=${websiteStatus}`);
+        if (status) queryParams.push(`status=${status}`);
+        if (category) queryParams.push(`category=${category}`);
+        if (city) queryParams.push(`city=${city}`);
+        if (selectedSearchQueryId) queryParams.push(`searchQueryId=${selectedSearchQueryId}`);
+        if (quickFilter) queryParams.push(`quickFilter=${quickFilter}`);
+        
+        if (queryParams.length > 0) {
+          path += `?${queryParams.join('&')}`;
+        }
       }
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || '/api'}${path}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        if (response.status === 403) {
+          alert("You do not have permission to export leads.");
+        } else {
+          alert("Failed to export leads.");
+        }
+        return;
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ClientScout_Leads_${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export error:", err);
+      alert("An error occurred during export.");
     }
-    
-    return baseUrl ? `${baseUrl}${path}` : path;
   };
 
   const getOppBadgeColor = (level) => {
@@ -395,27 +429,18 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
           </div>
 
           {/* Export link */}
-          <a
-            href={error || totalLeads === 0 ? '#' : getExcelExportLink()}
-            onClick={(e) => {
-              if (error) {
-                e.preventDefault();
-              } else if (totalLeads === 0) {
-                e.preventDefault();
-                alert('No leads are available to export with the current filters. Please run a scanner search or adjust your filters.');
-              }
-            }}
-            target={error || totalLeads === 0 ? '_self' : '_blank'}
-            rel="noreferrer"
-            className={`font-bold text-xs px-4 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm ${
-              error || totalLeads === 0
-                ? 'bg-border text-text-muted cursor-not-allowed opacity-50' 
+          <button
+            onClick={handleExportExcel}
+            disabled={!!error || totalLeads === 0 || !canExport}
+            className={`font-bold text-xs px-4 py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+              error || totalLeads === 0 || !canExport
+                ? 'bg-border text-text-muted opacity-50' 
                 : 'bg-success hover:bg-success/90 text-background'
             }`}
           >
             <Download size={14} />
             <span>{selectedIds.length > 0 ? `Export Selected (${selectedIds.length})` : 'Export Lead Sheets'}</span>
-          </a>
+          </button>
         </div>
 
         {/* Filters Selectors Row (Responsive wrapping grid) */}
@@ -776,6 +801,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
           <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
             <CustomFilterSelect
               value=""
+              disabled={!canEdit}
               onChange={handleBulkStatusChange}
               options={bulkStatusOptions}
               widthClass="min-w-[130px]"
@@ -783,17 +809,20 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
 
             <button
               onClick={handleBulkAddNote}
-              className="bg-card hover:bg-border/60 border border-border text-text font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1 cursor-pointer"
+              disabled={!canEdit}
+              className="bg-card hover:bg-border/60 border border-border text-text disabled:opacity-40 disabled:cursor-not-allowed font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1 cursor-pointer"
             >
               <span>Log Note</span>
             </button>
 
-            <button
-              onClick={handleBulkDelete}
-              className="bg-danger/10 hover:bg-danger/20 border border-danger/20 text-danger font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1 cursor-pointer"
-            >
-              <span>Delete</span>
-            </button>
+            {canDelete && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-danger/10 hover:bg-danger/20 border border-danger/20 text-danger font-bold text-[10px] uppercase tracking-wider px-2.5 py-1 rounded h-7 transition-all flex items-center gap-1 cursor-pointer"
+              >
+                <span>Delete</span>
+              </button>
+            )}
 
             <button
               onClick={() => setSelectedIds([])}
@@ -810,6 +839,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
         <LeadDrawer
           leadId={selectedLeadId}
           onClose={() => setSelectedLeadId(null)}
+          user={user}
         />
       )}
     </div>

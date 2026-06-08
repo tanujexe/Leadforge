@@ -7,6 +7,39 @@ const api = axios.create({
   }
 });
 
+// Axios Request Interceptor: Automatically inject bearer token from localStorage
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+export const authService = {
+  login: async (idToken) => {
+    const response = await api.post('/auth/google-login', { idToken });
+    return response.data;
+  },
+  getMe: async () => {
+    const response = await api.get('/auth/me');
+    return response.data;
+  },
+  getUsers: async () => {
+    const response = await api.get('/auth/users');
+    return response.data;
+  },
+  updateUser: async (id, data) => {
+    const response = await api.put(`/auth/users/${id}`, data);
+    return response.data;
+  }
+};
+
 export const leadService = {
   getAll: async (params = {}) => {
     const response = await api.get('/leads', { params });
@@ -63,6 +96,58 @@ export const leadService = {
   bulkDelete: async (ids) => {
     const response = await api.post('/leads/bulk-delete', { ids });
     return response.data;
+  },
+
+  // Trash & Recovery Actions (Admin Only)
+  getTrash: async (params = {}) => {
+    const response = await api.get('/leads/trash', { params });
+    return response.data;
+  },
+
+  restore: async (id) => {
+    const response = await api.post(`/leads/trash/${id}/restore`);
+    return response.data;
+  },
+
+  purge: async (id) => {
+    const response = await api.delete(`/leads/trash/${id}/purge`);
+    return response.data;
+  },
+
+  bulkRestore: async (ids) => {
+    const response = await api.post('/leads/trash/bulk-restore', { ids });
+    return response.data;
+  },
+
+  bulkPurge: async (ids) => {
+    const response = await api.post('/leads/trash/bulk-purge', { ids });
+    return response.data;
+  },
+
+  // CRM & Activity
+  getActivity: async (id) => {
+    const response = await api.get(`/leads/${id}/activity`);
+    return response.data;
+  },
+
+  logCall: async (id, callOutcome, details, followUpDate) => {
+    const response = await api.post(`/leads/${id}/call`, { callOutcome, details, followUpDate });
+    return response.data;
+  },
+
+  assignLead: async (id, userId) => {
+    const response = await api.post(`/leads/${id}/assign`, { userId });
+    return response.data;
+  },
+
+  updateActivity: async (id, logId, data) => {
+    const response = await api.put(`/leads/${id}/activity/${logId}`, data);
+    return response.data;
+  },
+
+  deleteActivity: async (id, logId) => {
+    const response = await api.delete(`/leads/${id}/activity/${logId}`);
+    return response.data;
   }
 };
 
@@ -83,4 +168,24 @@ export const searchService = {
   }
 };
 
+export const managementService = {
+  getAnalytics: async () => {
+    const response = await api.get('/management/analytics');
+    return response.data;
+  },
+  getProductivity: async () => {
+    const response = await api.get('/management/productivity');
+    return response.data;
+  },
+  getTimeline: async () => {
+    const response = await api.get('/management/timeline');
+    return response.data;
+  },
+  getSchedule: async () => {
+    const response = await api.get('/management/schedule');
+    return response.data;
+  }
+};
+
 export default api;
+

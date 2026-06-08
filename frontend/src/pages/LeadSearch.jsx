@@ -126,7 +126,8 @@ function CustomSelect({ label, value, onChange, options, iconsMap, placeholder, 
   );
 }
 
-export default function LeadSearch() {
+export default function LeadSearch({ user }) {
+  const canScan = user?.role === 'Admin' || user?.permissions?.canScan;
   const startSearchMutation = useStartSearch();
   const [businessType, setBusinessType] = useState('');
   const [location, setLocation] = useState('');
@@ -385,60 +386,67 @@ export default function LeadSearch() {
         </div>
       )}
 
-      {/* 2. Scanner Settings Input Form */}
-      <div className="bg-card border border-border rounded-lg p-5">
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Scanner Configuration</h3>
-          <p className="text-[10px] text-text-muted mt-0.5">Specify search parameters to dispatch Map crawlers</p>
+  <div className="bg-card border border-border rounded-lg p-5">
+    <div>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Scanner Configuration</h3>
+      <p className="text-[10px] text-text-muted mt-0.5">Specify search parameters to dispatch Map crawlers</p>
+    </div>
+
+    <form onSubmit={handleSearchSubmit} className="flex flex-col gap-4 mt-5">
+      {!canScan && (
+        <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2.5 text-xs text-red-400">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>Access Restricted: Your account does not have permission to run new scans. Please contact your administrator.</span>
         </div>
+      )}
+      
+      <div className="flex flex-col md:flex-row gap-4 md:items-end">
+        <CustomSelect
+          label="Business Category (Niche)"
+          value={businessType}
+          onChange={setBusinessType}
+          options={categories}
+          iconsMap={categoryIcons}
+          placeholder="Select Niche..."
+          disabled={!!activeSearchId || !canScan}
+          icon={HelpCircle}
+        />
 
-        <form onSubmit={handleSearchSubmit} className="flex flex-col md:flex-row gap-4 mt-5 md:items-end">
-          
-          <CustomSelect
-            label="Business Category (Niche)"
-            value={businessType}
-            onChange={setBusinessType}
-            options={categories}
-            iconsMap={categoryIcons}
-            placeholder="Select Niche..."
-            disabled={!!activeSearchId}
-            icon={HelpCircle}
-          />
+        <CustomSelect
+          label="City / Location"
+          value={location}
+          onChange={setLocation}
+          options={cities}
+          placeholder="Select City..."
+          disabled={!!activeSearchId || !canScan}
+          icon={MapPin}
+        />
 
-          <CustomSelect
-            label="City / Location"
-            value={location}
-            onChange={setLocation}
-            options={cities}
-            placeholder="Select City..."
-            disabled={!!activeSearchId}
-            icon={MapPin}
-          />
+        <CustomSelect
+          label="Leads to Find"
+          value={limit}
+          onChange={setLimit}
+          options={limitOptions}
+          placeholder="Select limit..."
+          disabled={!!activeSearchId || !canScan}
+          icon={Hash}
+        />
 
-          <CustomSelect
-            label="Leads to Find"
-            value={limit}
-            onChange={setLimit}
-            options={limitOptions}
-            placeholder="Select limit..."
-            disabled={!!activeSearchId}
-            icon={Hash}
-          />
-
-          <button
-            type="submit"
-            disabled={startSearchMutation.isPending || !!activeSearchId || !businessType || !location}
-            className="w-full md:w-auto bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-text font-bold text-xs px-5 py-2 rounded-lg flex items-center justify-center gap-2 h-9 transition-all cursor-pointer"
-          >
-            {activeSearchId ? (
-              <span className="w-3.5 h-3.5 rounded-full border border-text border-t-transparent animate-spin"></span>
-            ) : (
-              <Play size={12} />
-            )}
-            <span>{activeSearchId ? 'Scanning' : 'Find Leads'}</span>
-          </button>
-        </form>
+        <button
+          type="submit"
+          disabled={startSearchMutation.isPending || !!activeSearchId || !businessType || !location || !canScan}
+          className="w-full md:w-auto bg-primary hover:bg-primary-hover disabled:bg-primary/50 text-text font-bold text-xs px-5 py-2 rounded-lg flex items-center justify-center gap-2 h-9 transition-all cursor-pointer disabled:cursor-not-allowed"
+        >
+          {activeSearchId ? (
+            <span className="w-3.5 h-3.5 rounded-full border border-text border-t-transparent animate-spin"></span>
+          ) : (
+            <Play size={12} />
+          )}
+          <span>{activeSearchId ? 'Scanning' : 'Find Leads'}</span>
+        </button>
       </div>
+    </form>
+  </div>
 
       {/* 3. Scraper Log Console */}
       {searchStatus && (
