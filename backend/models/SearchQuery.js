@@ -12,6 +12,12 @@ const SearchQuerySchema = new mongoose.Schema({
     type: String, 
     enum: ['Pending', 'Scraping', 'Auditing', 'Analyzing', 'Completed', 'Failed'], 
     default: 'Pending' 
+  },
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    default: null,
+    index: true 
   }
 }, {
   timestamps: true

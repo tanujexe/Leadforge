@@ -55,7 +55,13 @@ const LeadSchema = new mongoose.Schema({
   },
   notes: [NoteSchema],
   searchQueryId: [{ type: mongoose.Schema.Types.ObjectId, ref: 'SearchQuery' }],
-  isDeleted: { type: Boolean, default: false, index: true }
+  isDeleted: { type: Boolean, default: false, index: true },
+  
+  // CRM Tracking Fields
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+  followUpDate: { type: Date, default: null },
+  totalCalls: { type: Number, default: 0 }
 }, {
   timestamps: true
 });
