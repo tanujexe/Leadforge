@@ -3,7 +3,9 @@ import {
   Terminal, Play, Eye, AlertOctagon, HelpCircle, 
   ChevronDown, Check, Dumbbell, Coffee, Sparkles, 
   Stethoscope, Home, Utensils, Paintbrush, Wrench, 
-  Zap, Flower, Shirt, Cake, Bed, Car, Scale, MapPin 
+  Zap, Flower, Shirt, Cake, Bed, Car, Scale, MapPin,
+  Globe, Phone, Star, AlertTriangle, AlertCircle,
+  Flame, Snowflake, TrendingUp, MessageSquare, Hash
 } from 'lucide-react';
 import { useStartSearch } from '../hooks/useLeads';
 import { searchService } from '../services/api';
@@ -128,6 +130,16 @@ export default function LeadSearch() {
   const startSearchMutation = useStartSearch();
   const [businessType, setBusinessType] = useState('');
   const [location, setLocation] = useState('');
+  const [limit, setLimit] = useState(30);
+
+  const limitOptions = [
+    { value: 5, label: '5 Leads' },
+    { value: 10, label: '10 Leads' },
+    { value: 20, label: '20 Leads' },
+    { value: 30, label: '30 Leads (Default)' },
+    { value: 40, label: '40 Leads' },
+    { value: 50, label: '50 Leads' }
+  ];
   
   const [activeSearchId, setActiveSearchId] = useState(null);
   const [searchStatus, setSearchStatus] = useState(null);
@@ -138,6 +150,52 @@ export default function LeadSearch() {
   
   // Setup credentials error state
   const [setupError, setSetupError] = useState(null);
+
+  // Quick stats filter for live results preview
+  const [quickFilter, setQuickFilter] = useState(null);
+
+  const getOppBadgeColor = (level) => {
+    if (level === 'High') return 'bg-success/10 text-success border-success/20';
+    if (level === 'Medium') return 'bg-warning/10 text-warning border-warning/20';
+    return 'bg-danger/10 text-danger border-danger/20';
+  };
+
+  const getStatusBadgeColor = (status) => {
+    if (status === 'Closed') return 'bg-success/20 text-success border-success/30';
+    if (status === 'Rejected') return 'bg-danger/20 text-danger border-danger/30';
+    if (status === 'Interested' || status === 'Follow Up') return 'bg-warning/20 text-warning border-warning/30';
+    if (status === 'Contacted') return 'bg-primary/20 text-primary border-primary/30';
+    return 'bg-border/60 text-text-secondary border border-border';
+  };
+
+  const getWebsiteStatusColor = (status) => {
+    if (status === 'Responsive') return 'bg-success/10 text-success';
+    if (status === 'No Website') return 'bg-danger/10 text-danger';
+    if (status === 'Offline') return 'bg-danger/20 text-danger';
+    return 'bg-warning/10 text-warning';
+  };
+
+  // Calculate statistics counts dynamically on the streaming leadsList
+  const counts = {
+    hot: leadsList.filter(l => l.opportunityLevel === 'High').length,
+    warm: leadsList.filter(l => l.opportunityLevel === 'Medium').length,
+    cold: leadsList.filter(l => l.opportunityLevel === 'Low').length,
+    needWebsite: leadsList.filter(l => !l.website || l.websiteStatus === 'No Website').length,
+    needReputation: leadsList.filter(l => (l.rating || 0) < 4.0 || (l.reviewCount || 0) < 15).length,
+    needSocial: leadsList.filter(l => !l.website || l.opportunityLevel === 'High').length,
+    enriched: leadsList.filter(l => !!l.phone && !!l.website).length
+  };
+
+  const filteredLeads = leadsList.filter(lead => {
+    if (quickFilter === 'hot') return lead.opportunityLevel === 'High';
+    if (quickFilter === 'warm') return lead.opportunityLevel === 'Medium';
+    if (quickFilter === 'cold') return lead.opportunityLevel === 'Low';
+    if (quickFilter === 'needWebsite') return !lead.website || lead.websiteStatus === 'No Website';
+    if (quickFilter === 'needReputation') return (lead.rating || 0) < 4.0 || (lead.reviewCount || 0) < 15;
+    if (quickFilter === 'needSocial') return !lead.website || lead.opportunityLevel === 'High';
+    if (quickFilter === 'enriched') return !!lead.phone && !!lead.website;
+    return true;
+  });
   
   const consoleEndRef = useRef(null);
 
@@ -165,12 +223,12 @@ export default function LeadSearch() {
         const timestamp = () => `[${new Date().toLocaleTimeString()}]`;
         const newLogs = [];
 
-        if (data.status === 'Scraping' && !logs.some(l => l.includes('Maps Actor'))) {
+        if (data.status === 'Scraping' && !logs.some(l => l.toLowerCase().includes('maps actor'))) {
           newLogs.push(`${timestamp()} 📡 Spawning Apify Google Maps Actor for "${data.businessType}" in "${data.location}"...`);
           newLogs.push(`${timestamp()} 🌐 Scraper running in cloud workspace. Gathering coordinates, reviews, and website listings...`);
         }
 
-        if (data.status === 'Auditing' && !logs.some(l => l.includes('Crawler Engine'))) {
+        if (data.status === 'Auditing' && !logs.some(l => l.toLowerCase().includes('crawler engine'))) {
           newLogs.push(`${timestamp()} 📥 Scrape completed. Found ${data.leadCount} businesses.`);
           newLogs.push(`${timestamp()} 🤖 Bootstrapping lightweight crawler engine...`);
           newLogs.push(`${timestamp()} 🔎 Commencing website audits: testing HTTPS, page responsive viewports, and FCP load speed...`);
@@ -186,7 +244,7 @@ export default function LeadSearch() {
           }
         });
 
-        if (data.status === 'Analyzing' && !logs.some(l => l.includes('Groq LLM'))) {
+        if (data.status === 'Analyzing' && !logs.some(l => l.toLowerCase().includes('groq'))) {
           newLogs.push(`${timestamp()} 🧠 Passing technical profiles to Groq AI LLM...`);
           newLogs.push(`${timestamp()} ✍️ Writing custom phone call scripts, WhatsApp outreach templates, and landing page audit proposals...`);
         }
@@ -226,6 +284,7 @@ export default function LeadSearch() {
     setSetupError(null);
     setLogs([]);
     setLeadsList([]);
+    setQuickFilter(null);
     setSearchStatus('Pending');
 
     const t = `[${new Date().toLocaleTimeString()}]`;
@@ -233,11 +292,12 @@ export default function LeadSearch() {
       `${t} 🚀 Dispatching ClientScout Scan Query...`,
       `${t} 🔎 Business Type: "${businessType}"`,
       `${t} 📍 Location: "${location}"`,
+      `${t} 🔢 Limit: ${limit} leads`,
       `${t} 📬 Request received by backend queue.`
     ]);
 
     startSearchMutation.mutate(
-      { businessType, location },
+      { businessType, location, limit },
       {
         onSuccess: (res) => {
           if (res.success && res.data?.searchId) {
@@ -355,6 +415,16 @@ export default function LeadSearch() {
             icon={MapPin}
           />
 
+          <CustomSelect
+            label="Leads to Find"
+            value={limit}
+            onChange={setLimit}
+            options={limitOptions}
+            placeholder="Select limit..."
+            disabled={!!activeSearchId}
+            icon={Hash}
+          />
+
           <button
             type="submit"
             disabled={startSearchMutation.isPending || !!activeSearchId || !businessType || !location}
@@ -395,78 +465,231 @@ export default function LeadSearch() {
         </div>
       )}
 
-      {/* 4. Live Search Preview Table */}
+      {/* 4. Live Search Preview (Premium Card Grid View with Real-time Stats) */}
       {leadsList.length > 0 && (
-        <div className="bg-card border border-border rounded-lg p-5">
-          <div className="mb-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary">Scan Stream Preview</h3>
-            <p className="text-[10px] text-text-muted mt-0.5">Leads populated from current active scan job</p>
+        <div className="space-y-4">
+          {/* Quick Stats Toggles for Live Stream */}
+          <div className="flex md:grid md:grid-cols-7 gap-1.5 md:gap-3 mb-2 select-none">
+            {[
+              { id: 'hot', label: 'Hot', icon: Flame, count: counts.hot, color: 'hover:border-success/30 text-success bg-success/5 border-success/20', activeColor: 'border-success text-success bg-success/10 shadow-[0_0_12px_rgba(34,197,94,0.15)]' },
+              { id: 'warm', label: 'Warm', icon: Zap, count: counts.warm, color: 'hover:border-warning/30 text-warning bg-warning/5 border-warning/20', activeColor: 'border-warning text-warning bg-warning/10 shadow-[0_0_12px_rgba(245,158,11,0.15)]' },
+              { id: 'cold', label: 'Cold', icon: Snowflake, count: counts.cold, color: 'hover:border-danger/30 text-danger bg-danger/5 border-danger/20', activeColor: 'border-danger text-danger bg-danger/10 shadow-[0_0_12px_rgba(239,68,68,0.15)]' },
+              { id: 'needWebsite', label: 'No Website', icon: Globe, count: counts.needWebsite, color: 'hover:border-primary/30 text-primary bg-primary/5 border-primary/20', activeColor: 'border-primary text-primary bg-primary/10 shadow-[0_0_12px_rgba(37,99,235,0.15)]' },
+              { id: 'needReputation', label: 'Reputation Help', icon: TrendingUp, count: counts.needReputation, color: 'hover:border-warning/30 text-warning bg-warning/5 border-warning/20', activeColor: 'border-warning text-warning bg-warning/10 shadow-[0_0_12px_rgba(245,158,11,0.15)]' },
+              { id: 'needSocial', label: 'Social Media', icon: MessageSquare, count: counts.needSocial, color: 'hover:border-primary/30 text-text bg-elevated/40 border-border/40', activeColor: 'border-primary text-primary bg-primary/10 shadow-[0_0_12px_rgba(37,99,235,0.15)] border-primary' },
+              { id: 'enriched', label: 'Enriched', icon: Sparkles, count: counts.enriched, color: 'hover:border-success/30 text-success bg-success/5 border-success/20', activeColor: 'border-success text-success bg-success/10 shadow-[0_0_12px_rgba(34,197,94,0.15)]' }
+            ].map((item) => {
+              const isActive = quickFilter === item.id;
+              const IconComponent = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setQuickFilter(isActive ? null : item.id)}
+                  className={`flex-1 min-w-0 flex flex-col items-center justify-center p-1.5 md:p-3 rounded-lg md:rounded-xl border text-center transition-all duration-300 cursor-pointer h-12 md:h-20 ${
+                    isActive ? item.activeColor : `bg-[#18181B] border-border/50 hover:bg-elevated/10 ${item.color}`
+                  }`}
+                >
+                  <IconComponent className="size-4 md:size-5 mb-0.5 md:mb-1.5" />
+                  <span className="hidden md:block text-[10px] font-extrabold uppercase tracking-wider font-brand opacity-90 line-clamp-1">{item.label}</span>
+                  <span className="text-[10px] md:text-xs font-mono font-bold mt-0.5 opacity-70 leading-none">{item.count}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-border text-text-muted uppercase font-bold tracking-wider text-[10px]">
-                  <th className="py-2.5 px-3">Business Name</th>
-                  <th className="py-2.5 px-3 hidden sm:table-cell">Phone</th>
-                  <th className="py-2.5 px-3">Website</th>
-                  <th className="py-2.5 px-3 text-center">Score</th>
-                  <th className="py-2.5 px-3">Audit</th>
-                  <th className="py-2.5 px-3">Opportunity</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/30 text-text-secondary">
-                {leadsList.map((lead, idx) => {
-                  let oppBadge = 'bg-success/10 text-success border-success/20';
-                  if (lead.opportunityLevel === 'Medium') oppBadge = 'bg-warning/10 text-warning border-warning/20';
-                  if (lead.opportunityLevel === 'Low') oppBadge = 'bg-danger/10 text-danger border-danger/20';
+          <div className="bg-card border border-border rounded-lg p-5">
+            <div className="flex items-center justify-between mb-4 border-b border-border/40 pb-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-text-secondary font-brand">Scan Stream Preview</h3>
+                <p className="text-[10px] text-text-muted mt-0.5">
+                  Leads populated from current active scan job ({filteredLeads.length} matching filter)
+                </p>
+              </div>
+              {quickFilter && (
+                <button 
+                  onClick={() => setQuickFilter(null)}
+                  className="text-primary hover:underline text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
 
-                  let siteBadge = 'bg-success/10 text-success';
-                  if (lead.websiteStatus === 'No Website') siteBadge = 'bg-danger/10 text-danger';
-                  if (lead.websiteStatus === 'Offline') siteBadge = 'bg-danger/20 text-danger';
-                  if (lead.websiteStatus === 'Slow' || lead.websiteStatus === 'Outdated' || lead.websiteStatus === 'Non Responsive') {
-                    siteBadge = 'bg-warning/10 text-warning';
-                  }
+            {filteredLeads.length === 0 ? (
+              <div className="py-12 text-center text-text-muted/60 text-xs">
+                No streaming leads match the selected filter.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredLeads.map((lead, idx) => {
+                  const cleanPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
+                  const defaultMessage = `Hi ${lead.businessName}, I noticed a few technical issues with your online presence (such as your website audits and review metrics) and have drafted some suggestions. Would you be open to a quick call?`;
+                  const whatsappMsg = lead.whatsappPitch || defaultMessage;
+                  const whatsappUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsappMsg)}` : '#';
 
                   return (
-                    <tr key={idx} className="hover:bg-elevated/20 transition-all">
-                      <td className="py-2.5 px-3 font-bold text-text truncate max-w-[120px]">{lead.businessName}</td>
-                      <td className="py-2.5 px-3 hidden sm:table-cell font-mono">{lead.phone || '-'}</td>
-                      <td className="py-2.5 px-3 max-w-[120px] truncate">
-                        {lead.website ? (
-                          <a href={lead.website} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                            {lead.website}
+                    <div 
+                      key={lead._id || idx}
+                      onClick={() => lead._id && setSelectedLeadId(lead._id)}
+                      className={`group relative bg-[#18181B] border hover:bg-elevated/10 transition-all duration-300 rounded-xl p-5 flex flex-col justify-between gap-4 overflow-hidden ${
+                        lead._id 
+                          ? 'cursor-pointer border-border/60 hover:border-primary/40 hover:shadow-[0_0_20px_rgba(24,24,27,0.8)]' 
+                          : 'cursor-default border-border/40'
+                      }`}
+                    >
+                      {/* Top gradient glow accent */}
+                      {lead._id && (
+                        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      )}
+                      
+                      {/* Top Row: Score and Priority Badge */}
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-[10px] text-text-muted font-bold font-mono tracking-wider">
+                          SCORE: <span className="text-text font-bold text-xs">{lead.leadScore}</span>
+                        </span>
+
+                        <span className={`px-2 py-0.5 rounded-full border text-[9px] font-extrabold uppercase tracking-wider ${getOppBadgeColor(lead.opportunityLevel)}`}>
+                          {lead.opportunityLevel === 'High' ? '🔥 Hot' : lead.opportunityLevel === 'Medium' ? '⚡ Warm' : '❄️ Cold'}
+                        </span>
+                      </div>
+
+                      {/* Main Identity Info */}
+                      <div className="space-y-1">
+                        <h4 className="font-brand font-bold text-text text-base leading-snug group-hover:text-primary transition-colors duration-200 line-clamp-1">
+                          {lead.businessName}
+                        </h4>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                          <span>{lead.category || 'Niche'}</span>
+                          {lead.rating > 0 && (
+                            <>
+                              <span className="text-text-muted">•</span>
+                              <div className="flex items-center gap-0.5 text-warning">
+                                <Star size={10} fill="currentColor" className="stroke-current" />
+                                <span>{lead.rating}</span>
+                                <span className="text-text-muted font-normal">({lead.reviewCount})</span>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Details: Address, Phone, Website */}
+                      <div className="space-y-2 text-xs text-text-secondary border-t border-border/30 pt-3">
+                        <div className="flex items-start gap-2 text-text-muted">
+                          <MapPin size={13} className="mt-0.5 flex-shrink-0 text-text-muted" />
+                          <span className="line-clamp-1">{lead.address || 'No Address available'}</span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          {lead.phone ? (
+                            <a 
+                              href={`tel:${lead.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-1.5 font-mono text-[11px] text-text-secondary hover:text-primary transition-colors duration-150"
+                            >
+                              <Phone size={12} className="text-text-muted" />
+                              <span>{lead.phone}</span>
+                            </a>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-text-muted/50 font-mono text-[11px]">
+                              <Phone size={12} className="opacity-40" />
+                              <span>No Phone</span>
+                            </div>
+                          )}
+
+                          {lead.website ? (
+                            <a 
+                              href={lead.website} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-primary hover:underline text-[11px] font-bold flex items-center gap-1"
+                            >
+                              <Globe size={12} />
+                              <span className="truncate max-w-[120px]">{lead.website.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                            </a>
+                          ) : (
+                            <span className="text-[9px] text-danger bg-danger/10 px-2 py-0.5 rounded border border-danger/20 font-bold inline-flex items-center gap-0.5">
+                              No Website
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Service Opportunity Tags */}
+                      <div className="space-y-1.5 border-t border-border/30 pt-3">
+                        <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider font-mono">Service Needs</div>
+                        <div className="flex flex-wrap gap-1">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${getWebsiteStatusColor(lead.websiteStatus)}`}>
+                            {lead.websiteStatus === 'No Website' ? '🌐 Web Development' : `🌐 Audit: ${lead.websiteStatus}`}
+                          </span>
+
+                          {((lead.rating || 0) < 4.0 || (lead.reviewCount || 0) < 15) && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-warning/10 text-warning border border-warning/20">
+                              📈 Reputation Help
+                            </span>
+                          )}
+
+                          {(lead.opportunityLevel === 'High' || !lead.website) && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/10 text-text border border-primary/20">
+                              💬 Social Marketing
+                            </span>
+                          )}
+
+                          {lead.recommendedService && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-success/10 text-success border border-success/20 truncate max-w-full" title={lead.recommendedService}>
+                              ✨ {lead.recommendedService}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Outreach CTA Buttons */}
+                      <div className="flex items-center gap-2 border-t border-border/30 pt-3 mt-1" onClick={(e) => e.stopPropagation()}>
+                        {lead.phone ? (
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 bg-[#25D366] hover:bg-[#20ba56] text-black font-bold text-[10px] uppercase tracking-wider py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 shadow-sm"
+                          >
+                            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.705 1.459h.008c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                            </svg>
+                            <span>WhatsApp</span>
                           </a>
                         ) : (
-                          <span className="text-text-muted font-medium">None</span>
+                          <button
+                            disabled
+                            className="flex-1 bg-border/40 text-text-muted font-bold text-[10px] uppercase tracking-wider py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-not-allowed opacity-50 border border-border/20"
+                          >
+                            <span>No Phone</span>
+                          </button>
                         )}
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-text">{lead.leadScore}</td>
-                      <td className="py-2.5 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${siteBadge}`}>
-                          {lead.websiteStatus}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold ${oppBadge}`}>
-                          {lead.opportunityLevel}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <button
-                          onClick={() => setSelectedLeadId(lead._id)}
-                          className="bg-elevated hover:bg-border/60 p-1 rounded text-text-secondary hover:text-text flex items-center justify-center ml-auto cursor-pointer"
-                          title="Open Dossier"
-                        >
-                          <Eye size={12} />
-                        </button>
-                      </td>
-                    </tr>
+
+                        {lead._id ? (
+                          <button
+                            onClick={() => setSelectedLeadId(lead._id)}
+                            className="flex-1 border border-border/80 hover:bg-elevated hover:border-primary/50 text-text font-bold text-[10px] uppercase tracking-wider py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all duration-200 shadow-sm"
+                          >
+                            <Eye size={12} />
+                            <span>Details</span>
+                          </button>
+                        ) : (
+                          <button
+                            disabled
+                            className="flex-1 bg-border/40 text-text-muted font-bold text-[10px] uppercase tracking-wider py-2 rounded-lg flex items-center justify-center gap-1.5 cursor-not-allowed opacity-50 border border-border/20"
+                          >
+                            <span>Pending...</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
         </div>
       )}

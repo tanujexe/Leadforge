@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart2, Search, Database, Menu, X } from 'lucide-react';
+import { BarChart2, Search, Database, Menu, X, History } from 'lucide-react';
 import { useAppConfig } from '../hooks/useLeads';
 
 const LogoIcon = ({ className = "w-9 h-9" }) => (
@@ -36,6 +36,7 @@ export default function Layout({ activeTab, setActiveTab, children }) {
   const navItems = [
     { id: 'dashboard', name: 'Dashboard', icon: BarChart2 },
     { id: 'search', name: 'Find Leads', icon: Search },
+    { id: 'history', name: 'Scan History', icon: History },
     { id: 'database', name: 'Lead Database', icon: Database },
   ];
 
@@ -192,7 +193,7 @@ export default function Layout({ activeTab, setActiveTab, children }) {
         {/* Desktop Header Title */}
         <header className="hidden lg:flex h-14 border-b border-border px-8 items-center justify-between bg-card/20 select-none">
           <h1 className="text-sm font-bold text-text uppercase tracking-wider">
-            {activeTab === 'search' ? 'Scanner Controller' : activeTab === 'database' ? 'Lead Directory' : 'Control Center'}
+            {activeTab === 'search' ? 'Scanner Controller' : activeTab === 'database' ? 'Lead Directory' : activeTab === 'history' ? 'Scan History' : 'Control Center'}
           </h1>
           <div className="flex items-center gap-4 text-xs font-mono text-text-muted">
             <span>Server Status: Active</span>

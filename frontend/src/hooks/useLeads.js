@@ -133,7 +133,7 @@ export function useSearchHistory() {
 export function useStartSearch() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ businessType, location }) => searchService.create(businessType, location),
+    mutationFn: ({ businessType, location, limit }) => searchService.create(businessType, location, limit),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['searchHistory'] });
     }

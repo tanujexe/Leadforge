@@ -67,8 +67,8 @@ export const leadService = {
 };
 
 export const searchService = {
-  create: async (businessType, location) => {
-    const response = await api.post('/search', { businessType, location });
+  create: async (businessType, location, limit) => {
+    const response = await api.post('/search', { businessType, location, limit });
     return response.data;
   },
   
