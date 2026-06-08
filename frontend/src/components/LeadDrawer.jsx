@@ -1,20 +1,63 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Check, Calendar, Phone, Globe, MapPin, AlertCircle, Send, RefreshCw, Eye } from 'lucide-react';
-import { useLead, useUpdateLeadStatus, useAddLeadNote, useManuallyAuditLead, useManuallyRegenerateAI, useManuallyGenerateAI } from '../hooks/useLeads';
+import { X, Copy, Check, Calendar, Phone, Globe, MapPin, AlertCircle, RefreshCw, Clock, UserCheck, Edit2, Trash2 } from 'lucide-react';
+import { 
+  useLead, 
+  useUpdateLeadStatus, 
+  useAddLeadNote, 
+  useManuallyAuditLead, 
+  useManuallyRegenerateAI, 
+  useManuallyGenerateAI,
+  useLogCall,
+  useAssignLead,
+  useLeadActivity,
+  useUpdateActivity,
+  useDeleteActivity
+} from '../hooks/useLeads';
+import { authService } from '../services/api';
 
-export default function LeadDrawer({ leadId, onClose }) {
+export default function LeadDrawer({ leadId, onClose, user }) {
   const { data: leadResponse, isLoading, error } = useLead(leadId);
   const updateStatusMutation = useUpdateLeadStatus();
   const addNoteMutation = useAddLeadNote();
   const auditMutation = useManuallyAuditLead();
   const generateAiMutation = useManuallyGenerateAI();
   const regenerateAiMutation = useManuallyRegenerateAI();
+  const logCallMutation = useLogCall();
+  const assignMutation = useAssignLead();
+  const updateActivityMutation = useUpdateActivity();
+  const deleteActivityMutation = useDeleteActivity();
+  const { data: activityResponse, isLoading: isActivityLoading } = useLeadActivity(leadId);
 
   const [activePitchTab, setActivePitchTab] = useState('call');
   const [noteText, setNoteText] = useState('');
   const [copyFeedback, setCopyFeedback] = useState(false);
+  
+  // Call Logger States
+  const [callOutcome, setCallOutcome] = useState('Spoke with Owner');
+  const [callDetails, setCallDetails] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
+
+  // Team Assignment State
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [isAssigning, setIsAssigning] = useState(false);
+
+  // Edit Logs States
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editOutcome, setEditOutcome] = useState('');
+  const [editFollowUpDate, setEditFollowUpDate] = useState('');
+  const [editDetails, setEditDetails] = useState('');
 
   const lead = leadResponse?.data;
+
+  // Compute ownership-gated modifier checks
+  const isOwner = lead ? (!lead.owner || lead.owner._id === user?.id || lead.owner === user?.id) : true;
+  const isAssigned = lead?.assignedTo ? (lead.assignedTo._id === user?.id || lead.assignedTo === user?.id) : false;
+  const hasEditPermission = user?.role === 'Admin' || isOwner || isAssigned;
+  
+  // Final access capability
+  const canModifyThisLead = (user?.role === 'Admin' || user?.permissions?.canEditLeads) && hasEditPermission;
+  const isReadOnly = lead?.owner && !canModifyThisLead;
+  const canScan = user?.role === 'Admin' || user?.permissions?.canScan;
 
   // Handle ESC key to close
   useEffect(() => {
@@ -25,15 +68,69 @@ export default function LeadDrawer({ leadId, onClose }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  // Load team members for lead assignment
+  useEffect(() => {
+    const fetchTeam = async () => {
+      try {
+        const response = await authService.getUsers();
+        const approvedUsers = (response || []).filter(u => u.isApproved);
+        setTeamMembers(approvedUsers);
+      } catch (err) {
+        console.error('Failed to load team members:', err);
+      }
+    };
+    if (user && leadId) {
+      fetchTeam();
+    }
+  }, [user, leadId]);
+
   if (!leadId) return null;
 
   const handleStatusChange = (e) => {
+    if (!canModifyThisLead) return;
     updateStatusMutation.mutate({ id: leadId, status: e.target.value });
+  };
+
+  const handleAssignChange = (e) => {
+    if (!canModifyThisLead) return;
+    const targetUserId = e.target.value;
+    if (!targetUserId) return;
+    
+    setIsAssigning(true);
+    assignMutation.mutate({ id: leadId, userId: targetUserId }, {
+      onSuccess: () => {
+        setIsAssigning(false);
+      },
+      onError: (err) => {
+        setIsAssigning(false);
+        alert(err.response?.data?.message || err.message);
+      }
+    });
+  };
+
+  const handleLogCallSubmit = (e) => {
+    e.preventDefault();
+    if (!canModifyThisLead || logCallMutation.isPending) return;
+    
+    logCallMutation.mutate({
+      id: leadId,
+      callOutcome,
+      details: callDetails.trim() || `Call logged. Outcome: ${callOutcome}`,
+      followUpDate: followUpDate || null
+    }, {
+      onSuccess: () => {
+        setCallDetails('');
+        setFollowUpDate('');
+      },
+      onError: (err) => {
+        alert(err.response?.data?.message || err.message);
+      }
+    });
   };
 
   const handleAddNoteSubmit = (e) => {
     e.preventDefault();
-    if (!noteText.trim()) return;
+    if (!noteText.trim() || !canModifyThisLead) return;
     addNoteMutation.mutate({ id: leadId, content: noteText.trim() }, {
       onSuccess: () => {
         setNoteText('');
@@ -49,18 +146,85 @@ export default function LeadDrawer({ leadId, onClose }) {
   };
 
   const handleAuditClick = (force = false) => {
-    if (auditMutation.isPending) return;
+    if (!canScan || auditMutation.isPending) return;
     auditMutation.mutate({ id: leadId, force });
   };
 
   const handleGenerateAiClick = () => {
-    if (generateAiMutation.isPending) return;
+    if (!canScan || generateAiMutation.isPending) return;
     generateAiMutation.mutate(leadId);
   };
 
   const handleRegenAiClick = () => {
-    if (regenerateAiMutation.isPending) return;
+    if (!canScan || regenerateAiMutation.isPending) return;
     regenerateAiMutation.mutate(leadId);
+  };
+
+  // Activity Log Gated Permission Check
+  const canModifyThisLog = (log) => {
+    if (!['AddNote', 'CallLog'].includes(log.actionType)) return false;
+    const authorId = log.userId?._id || log.userId;
+    return user?.role === 'Admin' || (authorId && authorId === user?.id);
+  };
+
+  const startEditing = (log) => {
+    setEditingLogId(log._id);
+    setEditOutcome(log.callOutcome || 'Spoke with Owner');
+    setEditFollowUpDate(log.followUpDate ? new Date(log.followUpDate).toISOString().split('T')[0] : '');
+    
+    let rawText = log.details;
+    if (log.actionType === 'AddNote') {
+      rawText = log.details.replace(/^Note logged: "/, '').replace(/"$/, '').replace(/^Note added by .*?: "/, '').replace(/"$/, '');
+    }
+    setEditDetails(rawText);
+  };
+
+  const cancelEditing = () => {
+    setEditingLogId(null);
+    setEditOutcome('');
+    setEditFollowUpDate('');
+    setEditDetails('');
+  };
+
+  const handleEditSubmit = (e, logId, actionType) => {
+    e.preventDefault();
+    
+    const payload = {};
+    if (actionType === 'AddNote') {
+      payload.details = editDetails.trim();
+    } else {
+      payload.details = editDetails.trim();
+      payload.callOutcome = editOutcome;
+      payload.followUpDate = editFollowUpDate || null;
+    }
+
+    updateActivityMutation.mutate({
+      id: leadId,
+      logId,
+      data: payload
+    }, {
+      onSuccess: () => {
+        cancelEditing();
+      },
+      onError: (err) => {
+        alert(err.response?.data?.message || err.message);
+      }
+    });
+  };
+
+  const handleDeleteLog = (logId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this log entry? Lead call statistics will automatically sync.')) {
+      return;
+    }
+    
+    deleteActivityMutation.mutate({
+      id: leadId,
+      logId
+    }, {
+      onError: (err) => {
+        alert(err.response?.data?.message || err.message);
+      }
+    });
   };
 
   const getOpportunityColor = (level) => {
@@ -97,11 +261,19 @@ export default function LeadDrawer({ leadId, onClose }) {
           </div>
           <button 
             onClick={onClose}
-            className="p-1 hover:bg-elevated rounded text-text-secondary hover:text-text transition-all"
+            className="p-1 hover:bg-elevated rounded text-text-secondary hover:text-text transition-all cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
+
+        {/* Lock Banner for Read-Only State */}
+        {isReadOnly && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 text-amber-500 text-xs flex items-center gap-2 font-medium">
+            <AlertCircle size={14} className="flex-shrink-0" />
+            <span>Read-Only: This lead is owned by {lead?.owner?.name || 'another member'}. Only the owner or an admin can modify.</span>
+          </div>
+        )}
 
         {/* Drawer Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -160,24 +332,41 @@ export default function LeadDrawer({ leadId, onClose }) {
                 </div>
               </div>
 
-              {/* Status Select Box */}
-              <div className="bg-background/40 border border-border p-3.5 rounded-lg flex items-center justify-between">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[10px] text-text-muted font-bold uppercase tracking-wider">Outreach status</span>
-                  <span className="text-xs font-semibold text-text-secondary">Pipeline Placement</span>
+              {/* Status & Assignment Section */}
+              <div className="grid grid-cols-2 gap-3 bg-background/40 border border-border p-4 rounded-lg">
+                <div>
+                  <label className="block text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1">Outreach Status</label>
+                  <select
+                    value={lead.status}
+                    disabled={!canModifyThisLead}
+                    onChange={handleStatusChange}
+                    className="w-full bg-elevated border border-border text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-primary focus:border-primary text-text select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="New">New</option>
+                    <option value="Contacted">Contacted</option>
+                    <option value="Follow Up">Follow Up</option>
+                    <option value="Interested">Interested</option>
+                    <option value="Closed">Closed</option>
+                    <option value="Rejected">Rejected</option>
+                  </select>
                 </div>
-                <select
-                  value={lead.status}
-                  onChange={handleStatusChange}
-                  className="bg-elevated border border-border text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-primary focus:border-primary text-text select-none cursor-pointer"
-                >
-                  <option value="New">New</option>
-                  <option value="Contacted">Contacted</option>
-                  <option value="Follow Up">Follow Up</option>
-                  <option value="Interested">Interested</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Rejected">Rejected</option>
-                </select>
+                
+                <div>
+                  <label className="block text-[10px] text-text-muted font-bold uppercase tracking-wider mb-1">Assigned Agent</label>
+                  <select
+                    value={lead.assignedTo?._id || lead.assignedTo || ''}
+                    disabled={!canModifyThisLead || isAssigning}
+                    onChange={handleAssignChange}
+                    className="w-full bg-elevated border border-border text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-primary focus:border-primary text-text select-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">Unassigned</option>
+                    {teamMembers.map((member) => (
+                      <option key={member._id} value={member._id}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Technical Website Audit Details */}
@@ -188,8 +377,8 @@ export default function LeadDrawer({ leadId, onClose }) {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleAuditClick(false)}
-                        disabled={auditMutation.isPending}
-                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 transition-all disabled:text-text-muted"
+                        disabled={auditMutation.isPending || !canScan}
+                        className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 transition-all disabled:text-text-muted disabled:cursor-not-allowed cursor-pointer"
                         title="Run cached audit or query state"
                       >
                         <RefreshCw size={10} className={auditMutation.isPending && !auditMutation.variables?.force ? 'animate-spin' : ''} />
@@ -198,8 +387,8 @@ export default function LeadDrawer({ leadId, onClose }) {
                       <span className="text-text-muted text-[9px] select-none">|</span>
                       <button
                         onClick={() => handleAuditClick(true)}
-                        disabled={auditMutation.isPending}
-                        className="text-[10px] font-bold text-warning hover:underline flex items-center gap-1 transition-all disabled:text-text-muted"
+                        disabled={auditMutation.isPending || !canScan}
+                        className="text-[10px] font-bold text-warning hover:underline flex items-center gap-1 transition-all disabled:text-text-muted disabled:cursor-not-allowed cursor-pointer"
                         title="Bypass 7-day cache and crawl website using Playwright"
                       >
                         <RefreshCw size={10} className={auditMutation.isPending && auditMutation.variables?.force ? 'animate-spin' : ''} />
@@ -281,8 +470,8 @@ export default function LeadDrawer({ leadId, onClose }) {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={handleGenerateAiClick}
-                      disabled={generateAiMutation.isPending || regenerateAiMutation.isPending}
-                      className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 transition-all disabled:text-text-muted"
+                      disabled={generateAiMutation.isPending || regenerateAiMutation.isPending || !canScan}
+                      className="text-[10px] font-bold text-primary hover:underline flex items-center gap-1 transition-all disabled:text-text-muted disabled:cursor-not-allowed cursor-pointer"
                       title="Run cached Groq AI summary and pitches generation"
                     >
                       <RefreshCw size={10} className={generateAiMutation.isPending ? 'animate-spin' : ''} />
@@ -293,8 +482,8 @@ export default function LeadDrawer({ leadId, onClose }) {
                         <span className="text-text-muted text-[9px] select-none">|</span>
                         <button
                           onClick={handleRegenAiClick}
-                          disabled={generateAiMutation.isPending || regenerateAiMutation.isPending}
-                          className="text-[10px] font-bold text-warning hover:underline flex items-center gap-1 transition-all disabled:text-text-muted"
+                          disabled={generateAiMutation.isPending || regenerateAiMutation.isPending || !canScan}
+                          className="text-[10px] font-bold text-warning hover:underline flex items-center gap-1 transition-all disabled:text-text-muted disabled:cursor-not-allowed cursor-pointer"
                           title="Force regenerate pitches and summary via Groq"
                         >
                           <RefreshCw size={10} className={regenerateAiMutation.isPending ? 'animate-spin' : ''} />
@@ -350,7 +539,7 @@ export default function LeadDrawer({ leadId, onClose }) {
                       else if (activePitchTab === 'meeting') text = lead.meetingPitch;
                       handleCopyPitch(text);
                     }}
-                    className="flex items-center gap-1 text-[10px] text-primary hover:text-primary-hover font-semibold"
+                    className="flex items-center gap-1 text-[10px] text-primary hover:text-primary-hover font-semibold cursor-pointer"
                   >
                     {copyFeedback ? (
                       <>
@@ -373,7 +562,7 @@ export default function LeadDrawer({ leadId, onClose }) {
                       <button
                         key={tab}
                         onClick={() => setActivePitchTab(tab)}
-                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all ${
+                        className={`flex-1 py-1.5 text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer ${
                           activePitchTab === tab
                             ? 'border-primary text-text bg-card'
                             : 'border-transparent text-text-secondary hover:text-text hover:bg-background/20'
@@ -396,43 +585,251 @@ export default function LeadDrawer({ leadId, onClose }) {
                 </div>
               </div>
 
+              {/* Log Outreach Call Logger Panel */}
+              <div className="bg-card border border-border rounded-lg p-4 space-y-3.5">
+                <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                  <Phone size={12} className="text-primary" />
+                  Log Outreach Call
+                </h3>
+                
+                <form onSubmit={handleLogCallSubmit} className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[9px] text-text-muted font-bold uppercase tracking-wider mb-1">Call Outcome</label>
+                      <select
+                        value={callOutcome}
+                        disabled={!canModifyThisLead || logCallMutation.isPending}
+                        onChange={(e) => setCallOutcome(e.target.value)}
+                        className="w-full bg-background border border-border text-xs rounded-lg px-2.5 py-1.5 text-text cursor-pointer disabled:opacity-50"
+                      >
+                        <option value="Spoke with Owner">Spoke with Owner</option>
+                        <option value="Left Voicemail">Left Voicemail</option>
+                        <option value="Busy / No Answer">Busy / No Answer</option>
+                        <option value="Gatekeeper Blocked">Gatekeeper Blocked</option>
+                        <option value="Callback Scheduled">Callback Scheduled</option>
+                        <option value="Wrong Number">Wrong Number</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[9px] text-text-muted font-bold uppercase tracking-wider mb-1">Schedule Follow-up (Optional)</label>
+                      <input
+                        type="date"
+                        value={followUpDate}
+                        disabled={!canModifyThisLead || logCallMutation.isPending}
+                        onChange={(e) => setFollowUpDate(e.target.value)}
+                        className="w-full bg-background border border-border text-xs rounded-lg px-2.5 py-1.5 text-text disabled:opacity-50"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-[9px] text-text-muted font-bold uppercase tracking-wider mb-1">Call Summary & Notes</label>
+                    <textarea
+                      value={callDetails}
+                      disabled={!canModifyThisLead || logCallMutation.isPending}
+                      onChange={(e) => setCallDetails(e.target.value)}
+                      placeholder="Summarize the outcome, client objections, or next actions..."
+                      rows="2"
+                      className="w-full bg-background border border-border text-xs rounded-lg p-2 text-text placeholder-text-muted/50 disabled:opacity-50"
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={!canModifyThisLead || logCallMutation.isPending}
+                    className="w-full bg-primary hover:bg-primary-hover py-2 rounded-lg text-text font-bold text-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <Phone size={12} />
+                    <span>{logCallMutation.isPending ? 'Logging Call...' : 'Log Call & Update Status'}</span>
+                  </button>
+                </form>
+              </div>
+
               {/* Notes Timeline Logs */}
               <div className="space-y-3">
-                <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider">Dossier Notes</h3>
+                <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider">Add Dossier Note</h3>
                 
                 {/* Note entry Form */}
                 <form onSubmit={handleAddNoteSubmit} className="flex gap-2">
                   <input
                     type="text"
                     value={noteText}
+                    disabled={!canModifyThisLead}
                     onChange={(e) => setNoteText(e.target.value)}
-                    placeholder="Log client call details or follow ups..."
-                    className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder-text-muted/50"
+                    placeholder={canModifyThisLead ? "Log client details, pricing discussions, manual remarks..." : "You do not have permission to add notes"}
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder-text-muted/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <button 
                     type="submit" 
-                    disabled={addNoteMutation.isPending}
-                    className="bg-primary hover:bg-primary-hover px-3 py-1.5 rounded-lg text-text font-bold text-xs flex items-center gap-1 transition-all"
+                    disabled={addNoteMutation.isPending || !canModifyThisLead}
+                    className="bg-primary hover:bg-primary-hover px-3 py-1.5 rounded-lg text-text font-bold text-xs flex items-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   >
                     <span>Log</span>
                   </button>
                 </form>
+              </div>
 
-                {/* Timeline */}
-                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                  {lead.notes && lead.notes.length > 0 ? (
-                    lead.notes.map((note) => (
-                      <div key={note._id} className="bg-background/20 border border-border/40 p-2.5 rounded text-xs space-y-1">
-                        <div className="flex items-center gap-1 text-[10px] text-text-muted font-bold font-mono">
-                          <Calendar size={10} />
-                          <span>{new Date(note.createdAt).toLocaleString()}</span>
+              {/* Complete Chronological Activity History */}
+              <div className="space-y-3 border-t border-border pt-4">
+                <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={12} className="text-text-muted" />
+                  Activity History
+                </h3>
+                
+                <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                  {isActivityLoading ? (
+                    <div className="py-6 text-center text-xs text-text-muted font-mono animate-pulse">Loading activity logs...</div>
+                  ) : activityResponse?.data && activityResponse.data.length > 0 ? (
+                    <div className="relative pl-4 border-l border-border/85 space-y-4 ml-2 mt-2">
+                      {activityResponse.data.map((log) => (
+                        <div key={log._id} className="relative select-text">
+                          {/* Bullet Marker */}
+                          <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border-2 border-border bg-card" />
+                          
+                          <div className="bg-background/20 border border-border/40 p-3 rounded-lg text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[10px] text-text-muted">
+                              <span className="font-bold flex items-center gap-1">
+                                {log.userId?.picture ? (
+                                  <img src={log.userId.picture} className="w-3.5 h-3.5 rounded-full object-cover" alt="" />
+                                ) : (
+                                  <span className="w-3.5 h-3.5 rounded-full bg-primary/10 flex items-center justify-center text-[7px] text-primary font-bold">
+                                    {log.userId?.name ? log.userId.name.slice(0, 2).toUpperCase() : 'SYS'}
+                                  </span>
+                                )}
+                                <span>{log.userId?.name || 'System / Scan Worker'}</span>
+                              </span>
+                              <span className="font-mono text-[9px]">{new Date(log.timestamp).toLocaleString()}</span>
+                            </div>
+
+                            {/* Activity Log Editor Gating */}
+                            {editingLogId === log._id ? (
+                              log.actionType === 'AddNote' ? (
+                                <form onSubmit={(e) => handleEditSubmit(e, log._id, 'AddNote')} className="space-y-2 mt-1">
+                                  <textarea
+                                    value={editDetails}
+                                    onChange={(e) => setEditDetails(e.target.value)}
+                                    className="w-full bg-background border border-border text-xs rounded-lg p-2 text-text"
+                                    rows="2"
+                                  />
+                                  <div className="flex gap-2 justify-end">
+                                    <button 
+                                      type="button" 
+                                      onClick={cancelEditing}
+                                      className="px-2 py-1 bg-elevated hover:bg-border text-[10px] font-bold text-text-secondary hover:text-text rounded cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button 
+                                      type="submit" 
+                                      disabled={updateActivityMutation.isPending}
+                                      className="px-2 py-1 bg-primary hover:bg-primary-hover text-[10px] font-bold text-text rounded cursor-pointer"
+                                    >
+                                      {updateActivityMutation.isPending ? 'Saving...' : 'Save'}
+                                    </button>
+                                  </div>
+                                </form>
+                              ) : (
+                                <form onSubmit={(e) => handleEditSubmit(e, log._id, 'CallLog')} className="space-y-2 mt-1">
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="block text-[8px] text-text-muted font-bold uppercase tracking-wider mb-0.5">Outcome</label>
+                                      <select
+                                        value={editOutcome}
+                                        onChange={(e) => setEditOutcome(e.target.value)}
+                                        className="w-full bg-background border border-border text-[10px] rounded px-2 py-1 text-text cursor-pointer"
+                                      >
+                                        <option value="Spoke with Owner">Spoke with Owner</option>
+                                        <option value="Left Voicemail">Left Voicemail</option>
+                                        <option value="Busy / No Answer">Busy / No Answer</option>
+                                        <option value="Gatekeeper Blocked">Gatekeeper Blocked</option>
+                                        <option value="Callback Scheduled">Callback Scheduled</option>
+                                        <option value="Wrong Number">Wrong Number</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-[8px] text-text-muted font-bold uppercase tracking-wider mb-0.5">Follow-Up Date</label>
+                                      <input
+                                        type="date"
+                                        value={editFollowUpDate}
+                                        onChange={(e) => setEditFollowUpDate(e.target.value)}
+                                        className="w-full bg-background border border-border text-[10px] rounded px-2 py-1 text-text"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-[8px] text-text-muted font-bold uppercase tracking-wider mb-0.5">Summary</label>
+                                    <textarea
+                                      value={editDetails}
+                                      onChange={(e) => setEditDetails(e.target.value)}
+                                      className="w-full bg-background border border-border text-xs rounded-lg p-2 text-text"
+                                      rows="2"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2 justify-end">
+                                    <button 
+                                      type="button" 
+                                      onClick={cancelEditing}
+                                      className="px-2 py-1 bg-elevated hover:bg-border text-[10px] font-bold text-text-secondary hover:text-text rounded cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button 
+                                      type="submit" 
+                                      disabled={updateActivityMutation.isPending}
+                                      className="px-2 py-1 bg-primary hover:bg-primary-hover text-[10px] font-bold text-text rounded cursor-pointer"
+                                    >
+                                      {updateActivityMutation.isPending ? 'Saving...' : 'Save'}
+                                    </button>
+                                  </div>
+                                </form>
+                              )
+                            ) : (
+                              <div className="flex justify-between items-start">
+                                <p className="text-text-secondary leading-normal font-sans font-medium">{log.details}</p>
+                                
+                                {canModifyThisLog(log) && !editingLogId && (
+                                  <div className="flex items-center gap-1.5 ml-2">
+                                    <button
+                                      onClick={() => startEditing(log)}
+                                      className="p-1 hover:bg-elevated text-text-muted hover:text-primary rounded transition-all cursor-pointer"
+                                      title="Edit Log"
+                                    >
+                                      <Edit2 size={11} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteLog(log._id)}
+                                      disabled={deleteActivityMutation.isPending}
+                                      className="p-1 hover:bg-elevated text-text-muted hover:text-danger rounded transition-all cursor-pointer"
+                                      title="Delete Log"
+                                    >
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {(log.callOutcome || log.followUpDate) && !editingLogId && (
+                              <div className="flex flex-wrap gap-1.5 text-[9px] font-mono mt-1">
+                                {log.callOutcome && (
+                                  <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">
+                                    Outcome: {log.callOutcome}
+                                  </span>
+                                )}
+                                {log.followUpDate && (
+                                  <span className="bg-warning/10 text-warning px-1.5 py-0.5 rounded font-bold">
+                                    Follow Up: {new Date(log.followUpDate).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-text-secondary leading-normal font-sans select-text">{note.content}</p>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   ) : (
-                    <div className="text-[10px] font-bold text-text-muted/60 text-center py-4 bg-background/10 rounded border border-dashed border-border/40 uppercase tracking-wider">
-                      Timeline empty.
+                    <div className="text-[10px] font-bold text-text-muted/60 text-center py-6 bg-background/10 rounded border border-dashed border-border/40 uppercase tracking-wider">
+                      No activities logged yet.
                     </div>
                   )}
                 </div>

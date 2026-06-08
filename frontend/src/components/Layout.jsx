@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart2, Search, Database, Menu, X, History } from 'lucide-react';
+import { BarChart2, Search, Database, Menu, X, History, Shield, LogOut, Activity } from 'lucide-react';
 import { useAppConfig } from '../hooks/useLeads';
 
 const LogoIcon = ({ className = "w-9 h-9" }) => (
@@ -29,21 +29,78 @@ const LogoIcon = ({ className = "w-9 h-9" }) => (
   </svg>
 );
 
-export default function Layout({ activeTab, setActiveTab, children }) {
+export default function Layout({ activeTab, setActiveTab, user = { name: 'Scout Admin', role: 'Admin', email: 'dev@clientscout.app' }, onLogout, children }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { data: config } = useAppConfig();
 
   const navItems = [
     { id: 'dashboard', name: 'Dashboard', icon: BarChart2 },
+    { id: 'management', name: 'Management CRM', icon: Activity },
     { id: 'search', name: 'Find Leads', icon: Search },
     { id: 'history', name: 'Scan History', icon: History },
     { id: 'database', name: 'Lead Database', icon: Database },
   ];
 
+  // Dynamically add Team & Trash tab for Admin users
+  if (user?.role === 'Admin') {
+    navItems.push({ id: 'team', name: 'Team & Trash', icon: Shield });
+  }
+
   const handleNavClick = (id) => {
     setActiveTab(id);
     setMobileMenuOpen(false); // Auto-close drawer on mobile
   };
+
+  const renderProfileFooter = () => (
+    <div className="p-4 border-t border-border bg-[#111113]/10 flex flex-col gap-2.5">
+      <div className="flex items-center gap-3">
+        {user?.picture ? (
+          <img 
+            src={user.picture} 
+            alt={user.name} 
+            className="w-8 h-8 rounded-full border border-border object-cover" 
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-extrabold text-xs font-brand">
+            {user?.name ? user.name.slice(0, 2).toUpperCase() : 'CS'}
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h4 className="text-xs font-bold text-text truncate font-brand leading-none">
+            {user?.name || 'Scout User'}
+          </h4>
+          <span className="text-[9px] text-text-muted font-semibold tracking-wider mt-0.5 inline-block">
+            {user?.role === 'Admin' ? 'Admin Access' : 'Scout Pro'}
+          </span>
+        </div>
+        <button 
+          onClick={onLogout} 
+          title="Log Out"
+          className="p-1.5 hover:bg-red-500/10 text-text-secondary hover:text-red-400 rounded-lg transition-colors cursor-pointer"
+        >
+          <LogOut size={14} />
+        </button>
+      </div>
+      
+      {/* Show scan limits/quotas for users */}
+      {user?.role !== 'Admin' && (
+        <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-lg p-1.5 px-2.5 text-[9px] text-zinc-400 flex items-center justify-between font-mono">
+          <span>Scans Today:</span>
+          <span className="font-bold text-zinc-200">
+            {user?.dailyScansUsed || 0} / {user?.dailyScanLimit || 5}
+          </span>
+        </div>
+      )}
+      
+      <div className="flex justify-between items-center text-[9px] text-text-muted font-mono pt-1 border-t border-border/10">
+        <span>Version 1.0.0</span>
+        <span className="flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
+          <span>Online</span>
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex h-screen w-screen bg-background text-text overflow-hidden font-sans flex-col lg:flex-row">
@@ -98,24 +155,7 @@ export default function Layout({ activeTab, setActiveTab, children }) {
         </div>
 
         {/* Footer Account Profile Info */}
-        <div className="p-4 border-t border-border bg-[#111113]/10 flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-extrabold text-xs font-brand">
-              CS
-            </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-bold text-text truncate font-brand leading-none">Scout Account</h4>
-              <span className="text-[9px] text-text-muted font-bold uppercase tracking-wider mt-0.5 inline-block">Pro Access</span>
-            </div>
-          </div>
-          <div className="flex justify-between items-center text-[9px] text-text-muted font-mono pt-1 border-t border-border/10">
-            <span>Version 1.0.0</span>
-            <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-              <span>Online</span>
-            </span>
-          </div>
-        </div>
+        {renderProfileFooter()}
       </aside>
 
       {/* Mobile Drawer Navigation (Overlay menu) */}
@@ -160,24 +200,7 @@ export default function Layout({ activeTab, setActiveTab, children }) {
             </div>
             
             {/* Footer Account Profile Info */}
-            <div className="p-4 border-t border-border bg-[#111113]/10 flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/30 flex items-center justify-center text-primary font-extrabold text-xs">
-                  CS
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-bold text-text truncate leading-none">Scout Account</h4>
-                  <span className="text-[9px] text-text-muted font-bold uppercase tracking-wider mt-0.5 inline-block">Pro Access</span>
-                </div>
-              </div>
-              <div className="flex justify-between items-center text-[9px] text-text-muted font-mono pt-1 border-t border-border/10">
-                <span>Version 1.0.0</span>
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-                  <span>Online</span>
-                </span>
-              </div>
-            </div>
+            {renderProfileFooter()}
           </aside>
         </div>
       )}
@@ -188,7 +211,7 @@ export default function Layout({ activeTab, setActiveTab, children }) {
         {/* Desktop Header Title */}
         <header className="hidden lg:flex h-14 border-b border-border px-8 items-center justify-between bg-card/20 select-none">
           <h1 className="text-sm font-bold text-text uppercase tracking-wider">
-            {activeTab === 'search' ? 'Scanner Controller' : activeTab === 'database' ? 'Lead Directory' : activeTab === 'history' ? 'Scan History' : 'Control Center'}
+            {activeTab === 'search' ? 'Scanner Controller' : activeTab === 'database' ? 'Lead Directory' : activeTab === 'history' ? 'Scan History' : activeTab === 'management' ? 'Management Dashboard' : activeTab === 'team' ? 'Team Control Panel' : 'Control Center'}
           </h1>
           <div className="flex items-center gap-4 text-xs font-mono text-text-muted">
             <span>Server Status: Active</span>
@@ -203,3 +226,4 @@ export default function Layout({ activeTab, setActiveTab, children }) {
     </div>
   );
 }
+
