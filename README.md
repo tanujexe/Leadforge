@@ -1,12 +1,12 @@
-# 🚀 LeadForge AI
+# 🚀 ClientScout
 
 > **A smart assistant that finds local business clients, checks their websites, and writes personalized pitches—all automatically.**
 
-LeadForge AI is a specialized tool built for freelancers, web designers, and developers. It helps them find local businesses (like restaurants, plumbers, or dental clinics) that need help with their websites, analyzes their current sites for issues, and uses AI to write personalized outreach emails to win them as clients.
+ClientScout is a specialized tool built for freelancers, web designers, and developers. It helps them find local businesses (like restaurants, plumbers, or dental clinics) that need help with their websites, analyzes their current sites for issues, and uses AI to write personalized outreach emails to win them as clients.
 
 ---
 
-## 🎯 What is LeadForge AI? (In Simple Terms)
+## 🎯 What is ClientScout? (In Simple Terms)
 
 Imagine you want to offer web design services to local businesses in your city. Doing this manually is exhausting:
 1. You search Google Maps for businesses.
@@ -14,7 +14,7 @@ Imagine you want to offer web design services to local businesses in your city. 
 3. You check if the websites look good on phones, load fast, and are easy to find.
 4. You write a personalized email to each business explaining how you can help.
 
-**LeadForge AI automates this entire process in seconds:**
+**ClientScout automates this entire process in seconds:**
 - **🔍 Smart Search:** It automatically finds businesses in any category and location (e.g., "Dentists in Boston") via Google Maps.
 - **⚡ Technical Audit:** It visits their website and tests:
   - Is it fast or slow?
@@ -25,7 +25,7 @@ Imagine you want to offer web design services to local businesses in your city. 
 
 ---
 
-## 🛠️ The Tech Stack (What Powers LeadForge AI)
+## 🛠️ The Tech Stack (What Powers ClientScout)
 
 Here is a breakdown of the technologies used, explained for both non-tech and tech readers:
 
@@ -54,7 +54,7 @@ Here is a breakdown of the technologies used, explained for both non-tech and te
 
 ## 📊 How Leads are Scored
 
-LeadForge AI automatically grades each business with a **Lead Score (from 0 to 100)** to help you target the best opportunities first. The score is calculated using these rules:
+ClientScout automatically grades each business with a **Lead Score (from 0 to 100)** to help you target the best opportunities first. The score is calculated using these rules:
 
 | Condition | Points Added | Why it matters |
 | :--- | :--- | :--- |
@@ -107,7 +107,7 @@ client_finder/
 
 ## 📋 Prerequisites
 
-To run LeadForge AI on your computer, you need:
+To run ClientScout on your computer, you need:
 1. **Node.js**: Version 18.0.0 or higher.
 2. **MongoDB**: Installed and running on your local machine.
    - *On Windows*, you can start MongoDB by opening PowerShell as Administrator and running:
@@ -119,7 +119,7 @@ To run LeadForge AI on your computer, you need:
 
 ## 🚀 Getting Started (Step-by-Step Setup)
 
-Follow these steps to run LeadForge AI on your machine:
+Follow these steps to run ClientScout on your machine:
 
 ### Step 1: Environment Settings
 Create a `.env` configuration file inside the `backend/` folder by copying the example file:
@@ -130,7 +130,7 @@ copy .env.example .env
 Open the new `.env` file in a text editor and fill in your details:
 ```env
 PORT=5000
-MONGODB_URI=mongodb://127.0.0.1:27017/leadforge
+MONGODB_URI=mongodb://127.0.0.1:27017/clientscout
 APIFY_TOKEN=your_apify_api_token
 GROQ_API_KEY=your_groq_api_key
 ```
