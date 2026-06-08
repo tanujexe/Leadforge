@@ -200,9 +200,6 @@ If you click **Sign in with Google** and see a red box saying `Firebase: Error (
   4. Find **Authorized domains** and click **Add domain**.
   5. Enter your website's address (for example: `clientscout-snowy.vercel.app`).
   6. Click **Add** to save. Google Sign-In will start working immediately!
-* **💡 Temporary Bypass (Developer Options)**:
-  * If you don't have access to the Firebase account or just want to quickly test the app, click **Show Developer Options** at the bottom of the login card.
-  * You can then click **Login as Admin** or **Login as Team User** to bypass Google Sign-in and go straight to the dashboard.
 
 ---
 

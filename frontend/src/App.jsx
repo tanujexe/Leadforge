@@ -8,6 +8,7 @@ import ScanHistory from './pages/ScanHistory.jsx';
 import TeamManagement from './pages/TeamManagement.jsx';
 import ManagementDashboard from './pages/ManagementDashboard.jsx';
 import Login from './pages/Login.jsx';
+import NotFound from './pages/NotFound.jsx';
 import { authService } from './services/api';
 import { UserCheck, LogOut, ShieldAlert } from 'lucide-react';
 
@@ -21,13 +22,39 @@ const queryClient = new QueryClient({
   }
 });
 
+// Valid app tabs for routing verification
+const VALID_TABS = ['dashboard', 'management', 'search', 'history', 'database', 'team'];
+
+// Resolve tab name from the browser URL path
+const getTabFromPath = (path) => {
+  const segment = path.replace(/^\//, '').split('/')[0];
+  if (!segment) return 'dashboard';
+  if (VALID_TABS.includes(segment)) return segment;
+  return '404';
+};
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(getTabFromPath(window.location.pathname));
   const [selectedSearchQueryId, setSelectedSearchQueryId] = useState(null);
   
   // User Authentication States
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Synchronize history API back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      setActiveTab(getTabFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Set the tab and push state to history for URL routing
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    window.history.pushState(null, '', '/' + tab);
+  };
 
   const checkSession = async () => {
     const token = localStorage.getItem('token');
@@ -57,8 +84,9 @@ export default function App() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    // Redirect Admin to Dashboard or whatever they were doing
-    setActiveTab('dashboard');
+    // Redirect user back to the tab they originally requested, or dashboard if invalid
+    const targetTab = getTabFromPath(window.location.pathname);
+    handleTabChange(targetTab === '404' ? 'dashboard' : targetTab);
   };
 
   const handleLogout = () => {
@@ -69,7 +97,7 @@ export default function App() {
   // Protect layout tabs: Reset to dashboard if unauthorized
   useEffect(() => {
     if (user && user.role !== 'Admin' && activeTab === 'team') {
-      setActiveTab('dashboard');
+      handleTabChange('dashboard');
     }
   }, [activeTab, user]);
 
@@ -118,13 +146,13 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <Layout 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={handleTabChange} 
         user={user} 
         onLogout={handleLogout}
       >
         {activeTab === 'dashboard' && (
           <Dashboard 
-            setActiveTab={setActiveTab} 
+            setActiveTab={handleTabChange} 
             setSelectedSearchQueryId={setSelectedSearchQueryId} 
             user={user}
           />
@@ -137,7 +165,7 @@ export default function App() {
         )}
         {activeTab === 'history' && (
           <ScanHistory 
-            setActiveTab={setActiveTab} 
+            setActiveTab={handleTabChange} 
             setSelectedSearchQueryId={setSelectedSearchQueryId} 
             user={user}
           />
@@ -151,6 +179,9 @@ export default function App() {
         )}
         {activeTab === 'team' && user.role === 'Admin' && (
           <TeamManagement currentUser={user} />
+        )}
+        {activeTab === '404' && (
+          <NotFound setActiveTab={handleTabChange} />
         )}
       </Layout>
     </QueryClientProvider>
