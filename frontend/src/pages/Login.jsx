@@ -8,6 +8,7 @@ export default function Login({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pendingUser, setPendingUser] = useState(null);
+  const [showMockOptions, setShowMockOptions] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -153,42 +154,59 @@ export default function Login({ onLoginSuccess }) {
         )}
 
         {/* Auth Button */}
-        {isFirebaseConfigured ? (
-          <button
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white hover:bg-zinc-100 active:bg-zinc-200 text-zinc-900 font-semibold rounded-xl text-sm transition-all duration-150 cursor-pointer shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.927h6.6c-.29 1.5-1.14 2.77-2.4 3.61v3h3.86c2.26-2.09 3.685-5.17 3.685-8.467z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-4v3.1A11.972 11.972 0 0 0 12 24z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.27 14.29a7.18 7.18 0 0 1 0-4.58v-3.1h-4v3.1a11.996 11.996 0 0 0 0 9.16l4-3.1H5.27z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.29 2.67 1.27 6.61l4 3.1c.95-2.85 3.6-4.96 6.73-4.96z"
-              />
-            </svg>
-            {loading ? 'Connecting...' : 'Sign in with Google'}
-          </button>
-        ) : (
+        {isFirebaseConfigured && (
           <div className="space-y-4">
-            {/* Warning Banner */}
-            <div className="p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-start gap-2.5 text-xs text-yellow-400">
-              <AlertTriangle className="w-4.5 h-4.5 shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold block">Config Variables Missing</span>
-                Firebase authentication variables are not set in your client `.env`. Starting in local offline bypass mode.
-              </div>
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white hover:bg-zinc-100 active:bg-zinc-200 text-zinc-900 font-semibold rounded-xl text-sm transition-all duration-150 cursor-pointer shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v3.927h6.6c-.29 1.5-1.14 2.77-2.4 3.61v3h3.86c2.26-2.09 3.685-5.17 3.685-8.467z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96h-4v3.1A11.972 11.972 0 0 0 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.27 14.29a7.18 7.18 0 0 1 0-4.58v-3.1h-4v3.1a11.996 11.996 0 0 0 0 9.16l4-3.1H5.27z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.29 2.67 1.27 6.61l4 3.1c.95-2.85 3.6-4.96 6.73-4.96z"
+                />
+              </svg>
+              {loading ? 'Connecting...' : 'Sign in with Google'}
+            </button>
+            
+            <div className="text-center pt-2">
+              <button
+                type="button"
+                onClick={() => setShowMockOptions(!showMockOptions)}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+              >
+                {showMockOptions ? "Hide Developer Options" : "Show Developer Options"}
+              </button>
             </div>
+          </div>
+        )}
+
+        {/* Developer Mock Portal */}
+        {(!isFirebaseConfigured || showMockOptions) && (
+          <div className={`${isFirebaseConfigured ? 'mt-6 border-t border-zinc-800/50 pt-4' : ''} space-y-4`}>
+            {/* Warning Banner */}
+            {!isFirebaseConfigured && (
+              <div className="p-3.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-start gap-2.5 text-xs text-yellow-400">
+                <AlertTriangle className="w-4.5 h-4.5 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-semibold block">Config Variables Missing</span>
+                  Firebase authentication variables are not set in your client `.env`. Starting in local offline bypass mode.
+                </div>
+              </div>
+            )}
 
             {/* Developer Mock Panels */}
             <div className="border border-zinc-800 bg-zinc-950/50 rounded-xl p-4">

@@ -159,3 +159,68 @@ npm install
 npm run dev
 ```
 The dashboard interface will start. Open `http://localhost:5173` in your web browser to start finding leads!
+
+---
+
+## 🌐 Hosting & Troubleshooting (How to Deploy)
+
+### 1. Hosting the Backend (Render)
+When you deploy the backend server to **Render.com**, make sure to set your build and start commands correctly:
+
+* **⚠️ Do NOT use `npm run dev` or `nodemon` on Render**: These are only meant for running the app on your local computer. Using them on Render will cause the server to crash and fail to start.
+* **🔧 Set the Start Command**: 
+  * If your Render Root Directory is set to `backend`, use:
+    ```bash
+    npm start
+    ```
+  * If your Render Root Directory is set to the main project folder, use:
+    ```bash
+    node backend/server.js
+    ```
+* **🔧 Set the Build Command**:
+  * If your Render Root Directory is set to `backend`, use:
+    ```bash
+    npm install
+    ```
+  * If your Render Root Directory is set to the main project folder, use:
+    ```bash
+    cd backend && npm install
+    ```
+
+---
+
+### 2. Google Login Error: `auth/unauthorized-domain`
+If you click **Sign in with Google** and see a red box saying `Firebase: Error (auth/unauthorized-domain)`:
+
+* **💡 Why this happens**: Google Sign-In is blocking your website because Google doesn't recognize your website's URL (like your Vercel address: `https://clientscout-snowy.vercel.app`) yet.
+* **🛠️ How to fix it**:
+  1. Open your [Firebase Console](https://console.firebase.google.com/).
+  2. Select your project.
+  3. Click on **Authentication** on the left-hand menu, then click the **Settings** tab.
+  4. Find **Authorized domains** and click **Add domain**.
+  5. Enter your website's address (for example: `clientscout-snowy.vercel.app`).
+  6. Click **Add** to save. Google Sign-In will start working immediately!
+* **💡 Temporary Bypass (Developer Options)**:
+  * If you don't have access to the Firebase account or just want to quickly test the app, click **Show Developer Options** at the bottom of the login card.
+  * You can then click **Login as Admin** or **Login as Team User** to bypass Google Sign-in and go straight to the dashboard.
+
+---
+
+### 3. Environment Variables Reference (Config Checklist)
+
+To make everything work in production, you must set these configuration variables in your hosting provider's settings panel:
+
+#### Backend settings (on Render)
+* `PORT`: Set to `10000` (Render handles this automatically).
+* `MONGODB_URI`: Your MongoDB database connection link. **(Required)**
+* `CLIENT_ORIGIN`: Your frontend website URL (e.g., `https://clientscout-snowy.vercel.app`).
+* `APIFY_TOKEN`: Required for real Google Maps lead scanning.
+* `GROQ_API_KEY`: Required for real AI pitch generation.
+* `JWT_SECRET`: A secret word of your choice to secure user logins.
+* `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`: Your Firebase Admin credentials (needed to verify Google login).
+
+#### Frontend settings (on Vercel/Netlify)
+* `VITE_API_URL`: The link to your hosted backend API (e.g., `https://client-finder-api.onrender.com/api`).
+* `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`: Your Firebase web app configuration settings (found in Firebase Project Settings).
+
+

@@ -12,10 +12,12 @@ const googleLogin = async (req, res) => {
 
     let decodedFirebaseToken;
 
-    // Check if DEVELOPMENT_MODE is active and Firebase is not fully configured to allow a mock developer log-in
+    // Check if DEVELOPMENT_MODE is active and Firebase is not fully configured OR client sent a mock token
     const isFirebaseConfigured = admin.apps.length > 0;
-    if (process.env.DEVELOPMENT_MODE === 'true' && !isFirebaseConfigured) {
-      console.warn("DEVELOPMENT_MODE is active and Firebase Admin is not configured. Simulating developer authentication.");
+    const isMockToken = idToken && (idToken.startsWith('{') || !idToken.includes('.'));
+
+    if (process.env.DEVELOPMENT_MODE === 'true' && (!isFirebaseConfigured || isMockToken)) {
+      console.warn("DEVELOPMENT_MODE is active. Processing simulated developer authentication.");
       try {
         // If developer sends a JSON token payload
         const mockData = JSON.parse(idToken);
