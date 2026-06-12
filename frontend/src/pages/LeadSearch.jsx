@@ -629,6 +629,11 @@ export default function LeadSearch({ user }) {
                       <div className="space-y-1.5 border-t border-border/30 pt-3">
                         <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider font-mono">Service Needs</div>
                         <div className="flex flex-wrap gap-1">
+                          {lead.customPitch && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20" title={lead.customPitch}>
+                              📝 Custom Pitch
+                            </span>
+                          )}
                           <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${getWebsiteStatusColor(lead.websiteStatus)}`}>
                             {lead.websiteStatus === 'No Website' ? '🌐 Web Development' : `🌐 Audit: ${lead.websiteStatus}`}
                           </span>
@@ -707,6 +712,7 @@ export default function LeadSearch({ user }) {
         <LeadDrawer
           leadId={selectedLeadId}
           onClose={() => setSelectedLeadId(null)}
+          user={user}
         />
       )}
     </div>

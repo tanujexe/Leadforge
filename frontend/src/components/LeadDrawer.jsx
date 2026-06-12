@@ -11,7 +11,8 @@ import {
   useAssignLead,
   useLeadActivity,
   useUpdateActivity,
-  useDeleteActivity
+  useDeleteActivity,
+  useUpdateLeadPitch
 } from '../hooks/useLeads';
 import { authService } from '../services/api';
 
@@ -26,10 +27,42 @@ export default function LeadDrawer({ leadId, onClose, user }) {
   const assignMutation = useAssignLead();
   const updateActivityMutation = useUpdateActivity();
   const deleteActivityMutation = useDeleteActivity();
+  const updatePitchMutation = useUpdateLeadPitch();
   const { data: activityResponse, isLoading: isActivityLoading } = useLeadActivity(leadId);
+
+  const lead = leadResponse?.data;
+
+  // Compute ownership-gated modifier checks
+  const isOwner = lead ? (!lead.owner || lead.owner._id === user?.id || lead.owner === user?.id) : true;
+  const isAssigned = lead?.assignedTo ? (lead.assignedTo._id === user?.id || lead.assignedTo === user?.id) : false;
+  const hasEditPermission = user?.role === 'Admin' || isOwner || isAssigned;
+  
+  // Final access capability
+  const canModifyThisLead = (user?.role === 'Admin' || user?.permissions?.canEditLeads) && hasEditPermission;
+  const isReadOnly = lead?.owner && !canModifyThisLead;
+  const canScan = user?.role === 'Admin' || user?.permissions?.canScan;
 
   const [activePitchTab, setActivePitchTab] = useState('call');
   const [noteText, setNoteText] = useState('');
+  const [customPitchText, setCustomPitchText] = useState('');
+
+  useEffect(() => {
+    if (lead) {
+      setCustomPitchText(lead.customPitch || '');
+    }
+  }, [lead?.customPitch]);
+
+  const handleSaveCustomPitch = () => {
+    if (!canModifyThisLead) return;
+    updatePitchMutation.mutate({
+      id: leadId,
+      customPitch: customPitchText
+    }, {
+      onError: (err) => {
+        alert(err.response?.data?.message || err.message);
+      }
+    });
+  };
   const [copyFeedback, setCopyFeedback] = useState(false);
   
   // Call Logger States
@@ -46,18 +79,6 @@ export default function LeadDrawer({ leadId, onClose, user }) {
   const [editOutcome, setEditOutcome] = useState('');
   const [editFollowUpDate, setEditFollowUpDate] = useState('');
   const [editDetails, setEditDetails] = useState('');
-
-  const lead = leadResponse?.data;
-
-  // Compute ownership-gated modifier checks
-  const isOwner = lead ? (!lead.owner || lead.owner._id === user?.id || lead.owner === user?.id) : true;
-  const isAssigned = lead?.assignedTo ? (lead.assignedTo._id === user?.id || lead.assignedTo === user?.id) : false;
-  const hasEditPermission = user?.role === 'Admin' || isOwner || isAssigned;
-  
-  // Final access capability
-  const canModifyThisLead = (user?.role === 'Admin' || user?.permissions?.canEditLeads) && hasEditPermission;
-  const isReadOnly = lead?.owner && !canModifyThisLead;
-  const canScan = user?.role === 'Admin' || user?.permissions?.canScan;
 
   // Handle ESC key to close
   useEffect(() => {
@@ -537,6 +558,7 @@ export default function LeadDrawer({ leadId, onClose, user }) {
                       else if (activePitchTab === 'whatsapp') text = lead.whatsappPitch;
                       else if (activePitchTab === 'email') text = lead.emailPitch;
                       else if (activePitchTab === 'meeting') text = lead.meetingPitch;
+                      else if (activePitchTab === 'custom') text = customPitchText;
                       handleCopyPitch(text);
                     }}
                     className="flex items-center gap-1 text-[10px] text-primary hover:text-primary-hover font-semibold cursor-pointer"
@@ -558,7 +580,7 @@ export default function LeadDrawer({ leadId, onClose, user }) {
                 <div className="border border-border rounded-lg overflow-hidden bg-card flex flex-col">
                   {/* Pitch Tab Toggles */}
                   <div className="flex border-b border-border bg-[#111113]/30">
-                    {['call', 'whatsapp', 'email', 'meeting'].map((tab) => (
+                    {['call', 'whatsapp', 'email', 'meeting', 'custom'].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActivePitchTab(tab)}
@@ -568,19 +590,52 @@ export default function LeadDrawer({ leadId, onClose, user }) {
                             : 'border-transparent text-text-secondary hover:text-text hover:bg-background/20'
                         }`}
                       >
-                        {tab}
+                        {tab === 'custom' ? 'my pitch' : tab}
                       </button>
                     ))}
                   </div>
 
                   {/* Pitch Contents */}
                   <div className="p-4 bg-[#111113]/10">
-                    <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap leading-relaxed select-text min-h-[100px] max-h-[220px] overflow-y-auto">
-                      {activePitchTab === 'call' && (lead.callPitch || 'Call pitch unavailable.')}
-                      {activePitchTab === 'whatsapp' && (lead.whatsappPitch || 'WhatsApp message unavailable.')}
-                      {activePitchTab === 'email' && (lead.emailPitch || 'Email outreach template unavailable.')}
-                      {activePitchTab === 'meeting' && (lead.meetingPitch || 'Meeting proposal details unavailable.')}
-                    </pre>
+                    {activePitchTab === 'custom' ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={customPitchText}
+                          onChange={(e) => setCustomPitchText(e.target.value)}
+                          disabled={!canModifyThisLead || updatePitchMutation.isPending}
+                          placeholder="Write your own personalized outreach pitch here..."
+                          rows="4"
+                          className="w-full bg-background border border-border text-xs rounded-lg p-2.5 text-text placeholder-text-muted/50 focus:ring-1 focus:ring-primary focus:border-primary font-sans leading-relaxed resize-none disabled:opacity-50 select-text"
+                        />
+                        <div className="flex justify-end gap-2">
+                          {(lead.customPitch || '') !== customPitchText && (
+                            <button
+                              type="button"
+                              onClick={() => setCustomPitchText(lead.customPitch || '')}
+                              disabled={updatePitchMutation.isPending}
+                              className="px-2.5 py-1 bg-elevated hover:bg-border text-[10px] font-bold text-text-secondary hover:text-text rounded transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              Reset
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleSaveCustomPitch}
+                            disabled={!canModifyThisLead || updatePitchMutation.isPending || (lead.customPitch || '') === customPitchText}
+                            className="px-3 py-1 bg-primary hover:bg-primary-hover text-[10px] font-bold text-text rounded transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {updatePitchMutation.isPending ? 'Saving...' : 'Save Pitch'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap leading-relaxed select-text min-h-[100px] max-h-[220px] overflow-y-auto">
+                        {activePitchTab === 'call' && (lead.callPitch || 'Call pitch unavailable.')}
+                        {activePitchTab === 'whatsapp' && (lead.whatsappPitch || 'WhatsApp message unavailable.')}
+                        {activePitchTab === 'email' && (lead.emailPitch || 'Email outreach template unavailable.')}
+                        {activePitchTab === 'meeting' && (lead.meetingPitch || 'Meeting proposal details unavailable.')}
+                      </pre>
+                    )}
                   </div>
                 </div>
               </div>
@@ -608,6 +663,7 @@ export default function LeadDrawer({ leadId, onClose, user }) {
                         <option value="Gatekeeper Blocked">Gatekeeper Blocked</option>
                         <option value="Callback Scheduled">Callback Scheduled</option>
                         <option value="Wrong Number">Wrong Number</option>
+                        <option value="Custom Log">Custom Log / Other</option>
                       </select>
                     </div>
                     <div>
@@ -744,6 +800,7 @@ export default function LeadDrawer({ leadId, onClose, user }) {
                                         <option value="Gatekeeper Blocked">Gatekeeper Blocked</option>
                                         <option value="Callback Scheduled">Callback Scheduled</option>
                                         <option value="Wrong Number">Wrong Number</option>
+                                        <option value="Custom Log">Custom Log / Other</option>
                                       </select>
                                     </div>
                                     <div>

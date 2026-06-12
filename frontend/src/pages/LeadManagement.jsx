@@ -14,6 +14,12 @@ const webPresenceOptions = [
   { value: 'false', label: 'No Website' }
 ];
 
+const customPitchOptions = [
+  { value: '', label: 'All Custom Pitches' },
+  { value: 'true', label: 'Has Custom Pitch' },
+  { value: 'false', label: 'No Custom Pitch' }
+];
+
 const priorityOptions = [
   { value: '', label: 'All Priorities' },
   { value: 'High', label: 'High Priority' },
@@ -143,6 +149,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
   const [status, setStatus] = useState('');
   const [category, setCategory] = useState('');
   const [city, setCity] = useState('');
+  const [hasCustomPitch, setHasCustomPitch] = useState('');
   
   // Pagination
   const [page, setPage] = useState(1);
@@ -164,7 +171,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
     setPage(1);
     setSelectedIds([]);
     setQuickFilter(null);
-  }, [search, hasWebsite, opportunityLevel, websiteStatus, status, category, city]);
+  }, [search, hasWebsite, opportunityLevel, websiteStatus, status, category, city, hasCustomPitch]);
 
   // Reset page when quickFilter or selectedSearchQueryId changes
   useEffect(() => {
@@ -181,6 +188,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
   if (status) filters.status = status;
   if (category) filters.category = category;
   if (city) filters.city = city;
+  if (hasCustomPitch) filters.hasCustomPitch = hasCustomPitch;
   if (quickFilter) filters.quickFilter = quickFilter;
   if (selectedSearchQueryId) filters.searchQueryId = selectedSearchQueryId;
 
@@ -287,6 +295,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
         if (status) queryParams.push(`status=${status}`);
         if (category) queryParams.push(`category=${category}`);
         if (city) queryParams.push(`city=${city}`);
+        if (hasCustomPitch) queryParams.push(`hasCustomPitch=${hasCustomPitch}`);
         if (selectedSearchQueryId) queryParams.push(`searchQueryId=${selectedSearchQueryId}`);
         if (quickFilter) queryParams.push(`quickFilter=${quickFilter}`);
         
@@ -459,6 +468,14 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
           />
 
           <CustomFilterSelect
+            value={hasCustomPitch}
+            onChange={setHasCustomPitch}
+            options={customPitchOptions}
+            disabled={!!error}
+            widthClass="min-w-[145px]"
+          />
+
+          <CustomFilterSelect
             value={opportunityLevel}
             onChange={setOpportunityLevel}
             options={priorityOptions}
@@ -498,7 +515,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
             widthClass="min-w-[100px]"
           />
 
-          {(hasWebsite || opportunityLevel || websiteStatus || status || category || city || search || quickFilter || selectedSearchQueryId) && (
+          {(hasWebsite || opportunityLevel || websiteStatus || status || category || city || hasCustomPitch || search || quickFilter || selectedSearchQueryId) && (
             <button
               onClick={() => {
                 setSearch('');
@@ -508,6 +525,7 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
                 setStatus('');
                 setCategory('');
                 setCity('');
+                setHasCustomPitch('');
                 setQuickFilter(null);
                 setSelectedSearchQueryId(null);
               }}
@@ -699,6 +717,12 @@ export default function LeadManagement({ selectedSearchQueryId, setSelectedSearc
                     <div className="space-y-1.5 border-t border-border/30 pt-3">
                       <div className="text-[9px] font-bold text-text-muted uppercase tracking-wider font-mono">Service Needs</div>
                       <div className="flex flex-wrap gap-1">
+                        {lead.customPitch && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20" title={lead.customPitch}>
+                            📝 Custom Pitch
+                          </span>
+                        )}
+
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${getWebsiteStatusColor(lead.websiteStatus)}`}>
                           {lead.websiteStatus === 'No Website' ? '🌐 Web Development' : `🌐 Audit: ${lead.websiteStatus}`}
                         </span>

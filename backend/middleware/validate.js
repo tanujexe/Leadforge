@@ -120,6 +120,18 @@ const idParamSchema = z.object({
   })
 });
 
+// 8. Lead Pitch Update Schema
+const pitchUpdateSchema = z.object({
+  params: z.object({
+    id: zMongoId
+  }),
+  body: z.object({
+    customPitch: z.string({ required_error: 'Custom pitch content is required' })
+      .trim()
+      .max(5000, { message: 'Custom pitch cannot exceed 5000 characters' })
+  })
+});
+
 module.exports = {
   validate,
   searchSchema,
@@ -128,5 +140,6 @@ module.exports = {
   bulkStatusSchema,
   bulkNoteSchema,
   bulkDeleteSchema,
-  idParamSchema
+  idParamSchema,
+  pitchUpdateSchema
 };

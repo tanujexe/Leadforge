@@ -31,6 +31,18 @@ export function useUpdateLeadStatus() {
   });
 }
 
+// Hook to update custom pitch of a single lead
+export function useUpdateLeadPitch() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, customPitch }) => leadService.updatePitch(id, customPitch),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead', variables.id] });
+    }
+  });
+}
+
 // Hook to append note to a single lead
 export function useAddLeadNote() {
   const queryClient = useQueryClient();

@@ -4,6 +4,7 @@ const {
   getAllLeads,
   getLeadById,
   updateLeadStatus,
+  updateLeadPitch,
   addLeadNote,
   deleteLead,
   manuallyAuditLeadWebsite,
@@ -27,6 +28,7 @@ const {
   validate,
   statusUpdateSchema,
   noteSchema,
+  pitchUpdateSchema,
   bulkStatusSchema,
   bulkNoteSchema,
   bulkDeleteSchema,
@@ -65,6 +67,7 @@ router.route('/:id')
 
 // 5. Status update and Note timeline mutations (Requires canEditLeads permission)
 router.put('/:id/status', requireAuth, checkPermission('canEditLeads'), validate(statusUpdateSchema), updateLeadStatus);
+router.put('/:id/pitch', requireAuth, checkPermission('canEditLeads'), validate(pitchUpdateSchema), updateLeadPitch);
 router.post('/:id/notes', requireAuth, checkPermission('canEditLeads'), validate(noteSchema), addLeadNote);
 
 // 6. Manual triggers (Requires canScan permission)

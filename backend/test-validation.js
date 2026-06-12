@@ -1,9 +1,9 @@
-const { z } = require('zod');
 const { 
   searchSchema, 
   statusUpdateSchema, 
   noteSchema, 
-  bulkStatusSchema 
+  bulkStatusSchema,
+  pitchUpdateSchema
 } = require('./middleware/validate');
 
 console.log('--- RUNNING ZOD REQUEST SCHEMA VALIDATION TESTS ---');
@@ -96,6 +96,27 @@ runTest(
   {
     params: { id: '65b9c24df7511c97a829da42' },
     body: { content: '' }
+  },
+  false
+);
+
+// 4. Test Pitch Update Schema
+runTest(
+  'Pitch Case A: Valid custom pitch',
+  pitchUpdateSchema,
+  {
+    params: { id: '65b9c24df7511c97a829da42' },
+    body: { customPitch: 'Custom personalized outreach pitch for this business.' }
+  },
+  true
+);
+
+runTest(
+  'Pitch Case B: Pitch content too long',
+  pitchUpdateSchema,
+  {
+    params: { id: '65b9c24df7511c97a829da42' },
+    body: { customPitch: 'a'.repeat(5001) }
   },
   false
 );

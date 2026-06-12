@@ -25,7 +25,11 @@ connectDB();
 const app = express();
 
 // 1. Secure HTTP Headers using Helmet
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: false,
+  crossOriginResourcePolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
 
 // 2. Prevent NoSQL Query Injection (sanitizes req.body, req.query, req.params)
 app.use(mongoSanitize());
@@ -44,7 +48,7 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // 4. Secure CORS Configuration
-const allowedOrigins = ['http://localhost:5173', 'https://clientscout-snowy.vercel.app'];
+const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://clientscout-snowy.vercel.app'];
 if (process.env.CLIENT_ORIGIN) {
   const envOrigins = process.env.CLIENT_ORIGIN.split(',').map(o => o.trim().replace(/\/$/, ''));
   envOrigins.forEach(origin => {

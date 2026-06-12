@@ -56,6 +56,11 @@ export const leadService = {
     return response.data;
   },
   
+  updatePitch: async (id, customPitch) => {
+    const response = await api.put(`/leads/${id}/pitch`, { customPitch });
+    return response.data;
+  },
+  
   addNote: async (id, content) => {
     const response = await api.post(`/leads/${id}/notes`, { content });
     return response.data;

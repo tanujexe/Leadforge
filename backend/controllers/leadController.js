@@ -63,7 +63,7 @@ const getAllLeads = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 50;
     const skip = (page - 1) * limit;
 
-    const { search, hasWebsite, opportunityLevel, status, websiteStatus, category, city, quickFilter, searchQueryId } = req.query;
+    const { search, hasWebsite, opportunityLevel, status, websiteStatus, category, city, quickFilter, searchQueryId, hasCustomPitch } = req.query;
     
     // Build query object (filter out soft-deleted leads)
     let query = { isDeleted: { $ne: true } };
@@ -130,12 +130,7 @@ const getAllLeads = async (req, res, next) => {
       if (hasWebsite === 'true') {
         query.website = { $exists: true, $nin: [null, '', 'null'] };
       } else {
-        query.$or = [
-          { website: { $exists: false } },
-          { website: null },
-          { website: '' },
-          { website: 'null' }
-        ];
+        query.website = { $in: [null, '', 'null'] };
       }
     }
 
@@ -147,6 +142,15 @@ const getAllLeads = async (req, res, next) => {
     // 7. Filter: Website Status
     if (websiteStatus) {
       query.websiteStatus = websiteStatus;
+    }
+
+    // Filter: Has Custom Pitch
+    if (hasCustomPitch) {
+      if (hasCustomPitch === 'true') {
+        query.customPitch = { $exists: true, $nin: [null, '', 'null'] };
+      } else {
+        query.customPitch = { $in: [null, '', 'null'] };
+      }
     }
 
     // 8. Filter: Quick Filter matching stats card categories
@@ -204,7 +208,8 @@ const getAllLeads = async (req, res, next) => {
       owner: 1,
       assignedTo: 1,
       followUpDate: 1,
-      totalCalls: 1
+      totalCalls: 1,
+      customPitch: 1
     };
 
     const totalLeads = await Lead.countDocuments(query);
@@ -326,6 +331,45 @@ const updateLeadStatus = async (req, res, next) => {
       req.user._id,
       'StatusChange',
       `Status updated from ${oldStatus} to ${status}.`
+    );
+
+    res.status(200).json({
+      success: true,
+      data: lead
+    });
+  } catch (error) {
+    if (error.statusCode) res.status(error.statusCode);
+    next(error);
+  }
+};
+
+/**
+ * Update user custom outreach pitch
+ */
+const updateLeadPitch = async (req, res, next) => {
+  try {
+    const { customPitch } = req.body;
+    if (customPitch === undefined) {
+      res.status(400);
+      throw new Error('Please provide customPitch value');
+    }
+
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      res.status(404);
+      throw new Error('Lead not found');
+    }
+
+    await checkLeadEditPermission(lead, req.user);
+    lead.customPitch = customPitch;
+    await lead.save();
+
+    // Log activity
+    await logActivity(
+      lead._id,
+      req.user._id,
+      'AddNote',
+      `Custom outreach pitch updated.`
     );
 
     res.status(200).json({
@@ -1090,6 +1134,7 @@ module.exports = {
   getAllLeads,
   getLeadById,
   updateLeadStatus,
+  updateLeadPitch,
   addLeadNote,
   deleteLead,
   manuallyAuditLeadWebsite,

@@ -46,6 +46,7 @@ const LeadSchema = new mongoose.Schema({
   whatsappPitch: { type: String, default: '' },
   emailPitch: { type: String, default: '' },
   meetingPitch: { type: String, default: '' },
+  customPitch: { type: String, default: '' },
   
   // Lead Management
   status: { 

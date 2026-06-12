@@ -13,7 +13,7 @@ const requireAuth = async (req, res, next) => {
       return res.status(401).json({ error: 'Unauthorized', message: 'Malformed authorization header' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'clientscout_secret_signing_key_2026');
     const user = await User.findById(decoded.id);
 
     if (!user) {
